@@ -14,6 +14,21 @@ public class Ride {
         
     }
 
+    public Ride(int cabid, String source, String destination, int fare) {
+        this.cabid = cabid;
+        this.source = source;
+        this.destination = destination;
+        this.fare = fare;
+    }
+
+    public Ride(int customerid, String source, String destination, int fare, int commission) {
+        this.customerid = customerid;
+        this.source = source;
+        this.destination = destination;
+        this.fare = fare;
+        this.commission = commission;
+    }
+
     public int getRideid() {
         return rideid;
     }

@@ -7,7 +7,6 @@ public class User {
     private int userid;
     private String name;
     private String username;
-
     private String encryptedpassword;
     private int age;
     private Gender gender;
