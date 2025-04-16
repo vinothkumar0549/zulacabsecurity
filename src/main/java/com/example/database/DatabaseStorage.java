@@ -291,7 +291,7 @@ public class DatabaseStorage implements Storage {
     }
 
     public List<List<Ride>> getAllCabRides() {
-        String query = "SELECT cabid, source, destination, fare, commission FROM ridedetails ORDER BY cabid ASC";
+        String query = "SELECT cabid, customerid, source, destination, fare, commission FROM ridedetails ORDER BY cabid ASC";
         Map<Integer, List<Ride>> cabRideMap = new TreeMap<>(); // TreeMap keeps keys sorted
 
         try (Connection connection = DatabaseConnection.getConnection();
@@ -301,7 +301,7 @@ public class DatabaseStorage implements Storage {
             while (result.next()) {
                 int cabId = result.getInt("cabid");
                 Ride ride = new Ride(
-                    cabId,
+                    result.getInt("customerid"),
                     result.getString("source"),
                     result.getString("destination"),
                     result.getInt("fare"),
@@ -321,7 +321,7 @@ public class DatabaseStorage implements Storage {
 
     public List<TotalSummary> getTotalCabSummary() {
 
-        String query = "SELECT cabid, COUNT(*) AS total_rides, SUM(fare) AS total_fare, SUM(commission) AS total_commission\r\n" + 
+        String query = "SELECT cabid, COUNT(*) AS total_rides, SUM(fare) AS total_fare, SUM(commission) AS total_commission \r\n" + 
                         "FROM ridedetails GROUP BY cabid ORDER BY cabid ASC;";      
         List<TotalSummary> totalcabsummary = new ArrayList<>();
         try (Connection connection = DatabaseConnection.getConnection();
@@ -333,9 +333,9 @@ public class DatabaseStorage implements Storage {
                 // Create a new Ride object for each row
                 TotalSummary totalSummary = new TotalSummary(
                     result.getInt("cabid"), // cabid
-                    result.getInt("trips"), // source
-                    result.getInt("fare"), // destination
-                    result.getInt("commission")
+                    result.getInt("total_rides"), // source
+                    result.getInt("total_fare"), // destination
+                    result.getInt("total_commission")
            
                 );
                
@@ -349,7 +349,7 @@ public class DatabaseStorage implements Storage {
     }
 
     public List<List<Ride>> getAllCustomerRides() {
-        String query = "SELECT cabid, source, destination, fare FROM ridedetails ORDER BY customer ASC";
+        String query = "SELECT cabid, customerid, source, destination, fare FROM ridedetails ORDER BY customerid ASC";
         Map<Integer, List<Ride>> customerRideMap = new TreeMap<>(); // TreeMap keeps keys sorted
 
         try (Connection connection = DatabaseConnection.getConnection();
@@ -357,15 +357,15 @@ public class DatabaseStorage implements Storage {
              ResultSet result = preparedStatement.executeQuery()) {
 
             while (result.next()) {
-                int cabId = result.getInt("customerid");
+                int customerId = result.getInt("customerid");
                 Ride ride = new Ride(
-                    cabId,
+                    result.getInt("cabid"),
                     result.getString("source"),
                     result.getString("destination"),
                     result.getInt("fare")
                 );
 
-                customerRideMap.computeIfAbsent(cabId, k -> new ArrayList<>()).add(ride);
+                customerRideMap.computeIfAbsent(customerId, k -> new ArrayList<>()).add(ride);
             }
 
         } catch (SQLException e) {
@@ -378,7 +378,7 @@ public class DatabaseStorage implements Storage {
 
     public List<TotalSummary> getTotalCustomerSummary() {
 
-        String query = "SELECT customerid, COUNT(*) AS total_rides, SUM(fare) AS total_fare\r\n" + 
+        String query = "SELECT customerid, COUNT(*) AS total_rides, SUM(fare) AS total_fare \r\n" + 
                         "FROM ridedetails GROUP BY customerid ORDER BY customerid ASC;";      
         List<TotalSummary> totalcustomersummary = new ArrayList<>();
         try (Connection connection = DatabaseConnection.getConnection();
@@ -389,9 +389,9 @@ public class DatabaseStorage implements Storage {
             while (result.next()) {
                 // Create a new Ride object for each row
                 TotalSummary totalSummary = new TotalSummary(
-                    result.getInt("cabid"), // cabid
-                    result.getInt("trips"), // source
-                    result.getInt("fare") // destination           
+                    result.getInt("customerid"), // cabid
+                    result.getInt("total_rides"), // source
+                    result.getInt("total_Fare") // destination           
                 );
                
                 totalcustomersummary.add(totalSummary);

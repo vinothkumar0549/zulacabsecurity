@@ -223,7 +223,7 @@ public class ZulacabController {
 
         try {
             List<Ride> customerrides = cabservice.customerSummary(customerusername, customerpassword);
-            return Response.status(Response.Status.OK).entity("{\"customersummary\": \"" + customerrides + "\"}").build();
+            return Response.status(Response.Status.OK).entity(Map.of("customersummary", customerrides)).build();
 
         } catch (BadRequestException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
@@ -249,7 +249,7 @@ public class ZulacabController {
 
         try {
             List<Ride> cabrides = cabservice.cabSummary(cabusername, cabpassword);
-            return Response.status(Response.Status.OK).entity("{\"cabsummary\": \"" + cabrides + "\"}").build();
+            return Response.status(Response.Status.OK).entity(Map.of("cabsummary", cabrides)).build();
 
         } catch (BadRequestException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();

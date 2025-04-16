@@ -6,14 +6,14 @@ public class CustomerAck {
     private int distance;
     private int fare;
     private String source;
-    private String destiantion;
+    private String destination;
 
     public CustomerAck(int cabid, int distance, int fare, String source, String destination) {
         this.cabid = cabid;
         this.distance = distance;
         this.fare = fare;
         this.source = source;
-        this.destiantion = destination;
+        this.destination = destination;
     }
 
     public int getCabid() {
@@ -48,12 +48,12 @@ public class CustomerAck {
         this.source = source;
     }
 
-    public String getDestiantion() {
-        return destiantion;
+    public String getDestination() {
+        return destination;
     }
 
-    public void setDestiantion(String destiantion) {
-        this.destiantion = destiantion;
+    public void setDestination(String destiantion) {
+        this.destination = destiantion;
     }
 
     @Override
@@ -64,7 +64,7 @@ public class CustomerAck {
         sb.append("distance=").append(distance).append(", ");
         sb.append("fare=").append(fare).append(", ");
         sb.append("source=").append(source).append(", ");
-        sb.append("destination=").append(destiantion).append(", ");
+        sb.append("destination=").append(destination).append(", ");
         sb.append("]");
         return sb.toString();
     }

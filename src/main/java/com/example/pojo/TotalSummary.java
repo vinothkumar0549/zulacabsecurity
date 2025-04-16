@@ -20,5 +20,48 @@ public class TotalSummary {
         this.fare = fare;
     }
 
+    public int getUserid() {
+        return userid;
+    }
+
+    public void setUserid(int userid) {
+        this.userid = userid;
+    }
+
+    public int getTrips() {
+        return trips;
+    }
+
+    public void setTrips(int trips) {
+        this.trips = trips;
+    }
+
+    public int getFare() {
+        return fare;
+    }
+
+    public void setFare(int fare) {
+        this.fare = fare;
+    }
+
+    public int getCommission() {
+        return commission;
+    }
+
+    public void setCommission(int commission) {
+        this.commission = commission;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(userid).append(", ");
+        sb.append(trips).append(", ");
+        sb.append(fare).append(", ");
+        sb.append(commission);
+        return sb.toString();
+    }
+
+    
     
 }
