@@ -150,40 +150,32 @@ public class DatabaseStorage implements Storage {
 
     public CustomerAck getFreeCab(int customerid, String source, String destination) {
         
-        String query = "SELECT cp.cabid,\r\n" +
-                        "ABS(src.distance - dest.distance) AS total_distance,\r\n" +
-                        "COUNT(rd.rideid) AS trip_count\r\n" +
-                        "FROM cabpositions cp\r\n" +
-                        "JOIN locations cl ON cp.locationid = cl.locationid\r\n" +
-                        "JOIN locations src ON src.locationname = ?\r\n" +
-                        "JOIN locations dest ON dest.locationname = ?\r\n" +
-                        "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid\r\n" +
-                        "WHERE cp.cabid != (SELECT cabid\r\n" +
-                        "FROM ridedetails\r\n" +
-                        "ORDER BY rideid DESC\r\n" +
-                        "LIMIT 1)\r\n" +
-                        "GROUP BY cp.cabid, cl.distance, src.distance, dest.distance\r\n" +
-                        "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC\r\n" +
-                        "LIMIT 1;";
+        String query = "SELECT cp.cabid, ABS(src.distance - dest.distance) AS total_distance, COUNT(rd.rideid) AS trip_count \r\n" +
+                        "FROM cabpositions cp JOIN locations cl ON cp.locationid = cl.locationid \r\n"+
+                        "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS src \r\n" +
+                        "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS dest  \r\n" +
+                        "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid WHERE cp.cabid != IFNULL(( \r\n" +
+                        "SELECT cabid FROM ridedetails ORDER BY rideid DESC LIMIT 1), -1) \r\n" +
+                        "GROUP BY cp.cabid, cl.distance \r\n"+
+                        "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC LIMIT 1;";
+    
  
 
         try (Connection connection = DatabaseConnection.getConnection();
-            PreparedStatement preparedStatementlocation = connection.prepareStatement(query)) {
+            PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 
-            preparedStatementlocation.setString(1, source);
-            preparedStatementlocation.setString(2, destination);
-            ResultSet result = preparedStatementlocation.executeQuery();
-                
+            preparedStatement.setString(1, source);
+            preparedStatement.setString(2, destination);
+            ResultSet result = preparedStatement.executeQuery();
             if (result.next()) {
+                System.out.println("\n\n\n\n\n\n\n\n\n\n\n Selected CAB ID: "+ result.getInt("cabid"));
                 return new CustomerAck(
                     result.getInt("cabid"),
                     result.getInt("total_distance"),
-                    (result.getInt("total_distance") * 3),
+                    (result.getInt("total_distance") * 10),
                     source,
                     destination
                 );
-
-
             }
                 
         } catch (SQLException e) {

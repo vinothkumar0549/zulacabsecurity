@@ -31,7 +31,7 @@ public class CabService {
             throw new SecurityException("Invalid Password");
         }
 
-        user.setEncryptedpassword(null);
+        //user.setEncryptedpassword(null);
         return user;
     }
 
@@ -61,8 +61,10 @@ public class CabService {
     public int addlocation(String adminusername, String adminpassword, String locationname, int distance){
 
         User AdminUser = storage.getUser(adminusername);
-
-        if(AdminUser == null || AdminUser.getRole() != Role.ADMIN){
+        if(AdminUser == null){
+            throw new BadRequestException("Admin Not Found");
+        }
+        if(AdminUser.getRole() != Role.ADMIN){
             throw new BadRequestException("Access Denied");
         }
         if(! AdminUser.getEncryptedpassword().equals(adminpassword)) {
@@ -191,3 +193,21 @@ public class CabService {
     }
 
 }
+
+
+
+// String query = "SELECT cp.cabid,\r\n" +
+//                         "ABS(src.distance - dest.distance) AS total_distance,\r\n" +
+//                         "COUNT(rd.rideid) AS trip_count\r\n" +
+//                         "FROM cabpositions cp\r\n" +
+//                         "JOIN locations cl ON cp.locationid = cl.locationid\r\n" +
+//                         "JOIN locations src ON src.locationname = ?\r\n" +
+//                         "JOIN locations dest ON dest.locationname = ?\r\n" +
+//                         "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid\r\n" +
+//                         "WHERE cp.cabid != (SELECT cabid\r\n" +
+//                         "FROM ridedetails\r\n" +
+//                         "ORDER BY rideid DESC\r\n" +
+//                         "LIMIT 1)\r\n" +
+//                         "GROUP BY cp.cabid, cl.distance, src.distance, dest.distance\r\n" +
+//                         "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC\r\n" +
+//                         "LIMIT 1;";

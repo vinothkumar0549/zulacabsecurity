@@ -54,6 +54,7 @@ public class ZulacabController {
             String name = userJson.getString("name");
             String username = userJson.getString("username");
             String password = userJson.getString("password");
+
             int age = userJson.getInt("age");
             Gender gender = Gender.valueOf(userJson.getString("gender"));
             Role role = Role.valueOf(userJson.getString("role"));
@@ -163,7 +164,7 @@ public class ZulacabController {
 
         try {
             CustomerAck customerAck = cabservice.bookcab(username, password, source, destination);
-            return Response.status(Response.Status.OK).entity("{\"Customer Acknowledge\": \"" + customerAck + "\"}").build();
+            return Response.status(Response.Status.OK).entity(customerAck).build();
 
         } catch (BadRequestException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
