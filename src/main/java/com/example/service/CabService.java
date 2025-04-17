@@ -38,13 +38,7 @@ public class CabService {
     public int register(User user, String adminusername, String adminpassword, String cablocation) {
         int locationid = 0;
         if(user.getRole() == Role.CAB) {
-            User AdminUser = storage.getUser(adminusername);
-            if(AdminUser == null || AdminUser.getRole() != Role.ADMIN){
-                throw new BadRequestException("Admin Not Found");
-            }
-            if(! AdminUser.getEncryptedpassword().equals(adminpassword)) {
-                throw new SecurityException("Invalid Admin Password");
-            }
+            validateUser(adminusername, adminpassword, Role.ADMIN);
             locationid = storage.checkLocation(cablocation);
             if(locationid == 0){
                 throw new IllegalArgumentException("Invalid Location");
@@ -60,16 +54,7 @@ public class CabService {
 
     public int addlocation(String adminusername, String adminpassword, String locationname, int distance){
 
-        User AdminUser = storage.getUser(adminusername);
-        if(AdminUser == null){
-            throw new BadRequestException("Admin Not Found");
-        }
-        if(AdminUser.getRole() != Role.ADMIN){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! AdminUser.getEncryptedpassword().equals(adminpassword)) {
-            throw new SecurityException("Invalid Admin Password");
-        }
+        validateUser(adminusername, adminpassword, Role.ADMIN);
         
         int locationid = storage.addLocation(locationname, distance);
         if(locationid == -1){
@@ -80,41 +65,20 @@ public class CabService {
 
     public String removelocation(String adminusername, String adminpassword, String locationname, int distance){
 
-        User AdminUser = storage.getUser(adminusername);
-        if(AdminUser == null){
-            throw new BadRequestException("Admin Not Found");
-        }
-        if(AdminUser.getRole() != Role.ADMIN){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! AdminUser.getEncryptedpassword().equals(adminpassword)) {
-            throw new SecurityException("Invalid Admin Password");
-        }
+        validateUser(adminusername, adminpassword, Role.ADMIN);
         
         return storage.removeLocation(locationname, distance);
     }
 
     public List<CabPositions> checkavailablecab(String customerusername, String customerpassword) {
-        User customer = storage.getUser(customerusername);
-        if(customer == null || customer.getRole() != Role.CUSTOMER){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! customer.getEncryptedpassword().equals(customerpassword)) {
-            throw new SecurityException("Invalid Customer Password");
-        }
+        validateUser(customerusername, customerpassword, Role.CUSTOMER);
         return storage.checkAvailableCab();
     }
 
     public CustomerAck bookcab(String customerusername, String customerpassword, String source, String destination) {
 
-        User customer = storage.getUser(customerusername);
+        User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
 
-        if(customer == null || customer.getRole() != Role.CUSTOMER){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! customer.getEncryptedpassword().equals(customerpassword)) {
-            throw new SecurityException("Invalid Customer Password");
-        }
         if(storage.checkLocation(source) == 0 || storage.checkLocation(destination) == 0){
             throw new IllegalArgumentException("Invalid Source or Destination");
         }
@@ -132,90 +96,43 @@ public class CabService {
     }
 
     public int confirmride(String customerusername, String customerpassword, int cabid, int distance, String source, String destination) {
-        User customer = storage.getUser(customerusername);
-
-        if(customer == null || customer.getRole() != Role.CUSTOMER){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! customer.getEncryptedpassword().equals(customerpassword)) {
-            throw new SecurityException("Invalid Customer Password");
-        }
+        User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
         storage.addRideHistory(customer.getUserid(), cabid, distance, source, destination);
         storage.updateCabPositions(cabid, storage.checkLocation(destination));
         return cabid;    
     }
 
     public List<Ride> customerSummary(String customerusername, String customerpassword) {
-        User customer = storage.getUser(customerusername);
-        if(customer == null || customer.getRole() != Role.CUSTOMER){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! customer.getEncryptedpassword().equals(customerpassword)) {
-            throw new SecurityException("Invalid Customer Password");
-        }
+        User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
         return storage.getCustomerRideSummary(customer.getUserid());
     }
 
     public List<Ride> cabSummary(String cabusername, String cabpassword) {
-        User cab = storage.getUser(cabusername);
-        if(cab == null || cab.getRole() != Role.CAB){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! cab.getEncryptedpassword().equals(cabpassword)) {
-            throw new SecurityException("Invalid Customer Password");
-        }
+        User cab = validateUser(cabusername, cabpassword, Role.CAB);
         return storage.getCabRideSummary(cab.getUserid());
     }
 
     public List<List<Ride>> getallcabsummary(String adminusername, String adminpassword){
 
-        User admin = storage.getUser(adminusername);
-
-        if(admin == null || admin.getRole() != Role.ADMIN){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! admin.getEncryptedpassword().equals(adminpassword)) {
-            throw new SecurityException("Invalid Customer Password");
-        }
+        validateUser(adminusername, adminpassword, Role.ADMIN);
 
         return storage.getAllCabRides();
     }
 
     public List<TotalSummary> gettotalcabsummary(String adminusername, String adminpassword){
-        User admin = storage.getUser(adminusername);
-
-        if(admin == null || admin.getRole() != Role.ADMIN){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! admin.getEncryptedpassword().equals(adminpassword)) {
-            throw new SecurityException("Invalid Customer Password");
-        }
+        validateUser(adminusername, adminpassword, Role.ADMIN);
         return storage.getTotalCabSummary();
     }
 
     public List<List<Ride>> getallcustomersummary(String adminusername, String adminpassword){
 
-        User admin = storage.getUser(adminusername);
-
-        if(admin == null || admin.getRole() != Role.ADMIN){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! admin.getEncryptedpassword().equals(adminpassword)) {
-            throw new SecurityException("Invalid Customer Password");
-        }
+        validateUser(adminusername, adminpassword, Role.ADMIN);
 
         return storage.getAllCustomerRides();
     }
 
     public List<TotalSummary> gettotalcustomersummary(String adminusername, String adminpassword){
-        User admin = storage.getUser(adminusername);
-
-        if(admin == null || admin.getRole() != Role.ADMIN){
-            throw new BadRequestException("Access Denied");
-        }
-        if(! admin.getEncryptedpassword().equals(adminpassword)) {
-            throw new SecurityException("Invalid Customer Password");
-        }
+        validateUser(adminusername, adminpassword, Role.ADMIN);
         return storage.getTotalCustomerSummary();
     }
 
@@ -247,6 +164,17 @@ public class CabService {
             }
         }
         return builder.toString();
+    }
+
+    private User validateUser(String username, String password, Role expectedRole) {
+        User user = storage.getUser(username);
+        if (user == null || user.getRole() != expectedRole) {
+            throw new BadRequestException("Access Denied");
+        }
+        if (!user.getEncryptedpassword().equals(password)) {
+            throw new SecurityException("Invalid Password");
+        }
+        return user;
     }
 
 }

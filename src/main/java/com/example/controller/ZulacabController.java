@@ -35,7 +35,7 @@ public class ZulacabController {
     @GET
     @Path("/hello")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response hello(){
+    public Response hello() {
         return Response.status(Response.Status.OK).entity("Hello World").build();
     }
 
@@ -67,6 +67,7 @@ public class ZulacabController {
             adminusername = json.getString("adminusername");
             adminpassword = json.getString("adminpassword");
             cablocation = json.getString("cablocation");
+            adminpassword = cabservice.encrypt(adminpassword, 1);
             }
 
             // You can now create a User object using the extracted data
@@ -79,7 +80,7 @@ public class ZulacabController {
             user.setRole(role);
             
             // Call the service to register the user
-            int id = cabservice.register(user, adminusername, cabservice.encrypt(adminpassword, 1), cablocation);
+            int id = cabservice.register(user, adminusername, adminpassword, cablocation);
 
             return Response.status(Response.Status.OK).entity("{\"userid\": \"" + id + "\"}").build();
 
