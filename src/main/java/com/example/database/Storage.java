@@ -3,6 +3,7 @@ package com.example.database;
 import java.util.List;
 
 import com.example.pojo.User;
+import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
 import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
@@ -18,6 +19,10 @@ public interface Storage {
     public int checkLocation(String cablocation);
 
     public int addLocation(String locationname, int distance);
+
+    public String removeLocation(String locationname, int distance);
+
+    public List<CabPositions> checkAvailableCab();
 
     public CustomerAck getFreeCab(int customerid, String source, String destination);
 

@@ -6,6 +6,7 @@ import java.util.Map;
 import org.json.*;
 import com.example.database.DatabaseStorage;
 import com.example.database.Storage;
+import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
 import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
@@ -149,6 +150,63 @@ public class ZulacabController {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
 
+    }
+
+    @POST
+    @Path("/removelocation")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response removelocation(String RequestBody, @Context HttpServletRequest request) {
+
+        JSONObject json = new JSONObject(RequestBody);
+
+        String adminusername = json.getString("adminusername");
+        String adminpassword = json.getString("adminpassword");
+        String locationname = json.getString("locationname");
+        int distance = json.getInt("distance");
+
+        if(adminusername == null || adminpassword == null || locationname == null || distance == 0){
+            throw new IllegalArgumentException("Invalid input");
+        }
+        
+        try {
+            String message = cabservice.removelocation(adminusername, adminpassword, locationname, distance);
+            return Response.status(Response.Status.OK).entity("{\"message\": \"" + message + "\"}").build();
+
+        } catch (BadRequestException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (SecurityException e) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        }
+
+    }
+
+    @POST
+    @Path("/checkavailablecab")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response checkavialablecab(String RequestBody, @Context HttpServletRequest request) {
+        JSONObject json = new JSONObject(RequestBody);
+        String customerusername = json.getString("customerusername");
+        String customerpassword = json.getString("customerpassword");
+
+        try {
+            List<CabPositions> availablecabs = cabservice.checkavailablecab(customerusername, customerpassword);
+            return Response.status(Response.Status.OK).entity(Map.of("availablecabs", availablecabs)).build();
+
+        } catch (BadRequestException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (SecurityException e) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (IllegalStateException e) {
+            return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        }
     }
 
     @POST

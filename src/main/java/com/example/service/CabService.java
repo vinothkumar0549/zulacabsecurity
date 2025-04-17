@@ -3,6 +3,7 @@ package com.example.service;
 import java.util.List;
 
 import com.example.database.Storage;
+import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
 import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
@@ -76,6 +77,33 @@ public class CabService {
             throw new BadRequestException("Location Name or Location Distance already exist");
         }
         return locationid;
+    }
+
+    public String removelocation(String adminusername, String adminpassword, String locationname, int distance){
+
+        User AdminUser = storage.getUser(adminusername);
+        if(AdminUser == null){
+            throw new BadRequestException("Admin Not Found");
+        }
+        if(AdminUser.getRole() != Role.ADMIN){
+            throw new BadRequestException("Access Denied");
+        }
+        if(! AdminUser.getEncryptedpassword().equals(adminpassword)) {
+            throw new SecurityException("Invalid Admin Password");
+        }
+        
+        return storage.removeLocation(locationname, distance);
+    }
+
+    public List<CabPositions> checkavailablecab(String customerusername, String customerpassword) {
+        User customer = storage.getUser(customerusername);
+        if(customer == null || customer.getRole() != Role.CUSTOMER){
+            throw new BadRequestException("Access Denied");
+        }
+        if(! customer.getEncryptedpassword().equals(customerpassword)) {
+            throw new SecurityException("Invalid Customer Password");
+        }
+        return storage.checkAvailableCab();
     }
 
     public CustomerAck bookcab(String customerusername, String customerpassword, String source, String destination) {

@@ -1,14 +1,17 @@
 package com.example.database;
 
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
 import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
@@ -146,6 +149,52 @@ public class DatabaseStorage implements Storage {
         }
 
         return -1;
+    }
+
+    public String removeLocation(String locationname, int distance) {
+
+        try (Connection connection = DatabaseConnection.getConnection();
+            CallableStatement callablestatement = connection.prepareCall("{call remove_location(?, ?, ?)}")) {
+
+            callablestatement.setString(1, locationname);
+            callablestatement.setInt(2, distance);
+            callablestatement.registerOutParameter(3, Types.VARCHAR);
+            callablestatement.execute();
+
+            return callablestatement.getString(3);
+
+        } catch (SQLException e) {
+            e.printStackTrace(); 
+        }
+
+        return null;
+    }
+
+    public List<CabPositions> checkAvailableCab() {
+        String query = "SELECT l.locationname, GROUP_CONCAT(c.cabid ORDER BY c.cabid) AS cabids \r\n" +
+                        "FROM locations l JOIN cabpositions c ON l.locationid = c.locationid \r\n" + //
+                        "GROUP BY l.locationname;";
+
+        List<CabPositions> availablecabs = new ArrayList<>();
+
+        try (Connection connection = DatabaseConnection.getConnection();
+            PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+                
+            ResultSet result = preparedStatement.executeQuery();
+                
+            while (result.next()) {
+                CabPositions availablecab = new CabPositions(
+                    result.getString("locationname"),
+                    result.getString("cabids")
+                );
+                    
+            availablecabs.add(availablecab);
+            }
+                
+        } catch (SQLException e) {
+            e.printStackTrace(); 
+        }
+        return availablecabs;
     }
 
     public CustomerAck getFreeCab(int customerid, String source, String destination) {
