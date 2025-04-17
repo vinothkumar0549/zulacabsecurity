@@ -23,7 +23,6 @@ public class CabService {
     public User login(String username, String password) {
 
         User user = storage.getUser(username);
-
         if(user == null){
             throw new BadRequestException("User Not Found");
         }
@@ -31,7 +30,7 @@ public class CabService {
         if(! user.getEncryptedpassword().equals(password)) {
             throw new SecurityException("Invalid Password");
         }
-
+        user.setEncryptedpassword(decrypt(password, 1));
         //user.setEncryptedpassword(null);
         return user;
     }
@@ -218,6 +217,36 @@ public class CabService {
             throw new SecurityException("Invalid Customer Password");
         }
         return storage.getTotalCustomerSummary();
+    }
+
+    public String encrypt(String password, int shift) {
+        StringBuilder builder = new StringBuilder();
+
+        for (char c : password.toCharArray()) {
+            if (Character.isLetterOrDigit(c)) {
+                char base = Character.isUpperCase(c) ? 'A' : (Character.isLowerCase(c) ? 'a' : '0');
+                int range = Character.isDigit(c) ? 10 : 26;
+                builder.append((char) (base + (c - base + shift) % range));
+            } else {
+                builder.append(c);
+            }
+        }
+        return builder.toString();
+    }
+
+    public String decrypt(String encryptedPassword, int shift) {
+        StringBuilder builder = new StringBuilder();
+    
+        for (char c : encryptedPassword.toCharArray()) {
+            if (Character.isLetterOrDigit(c)) {
+                char base = Character.isUpperCase(c) ? 'A' : (Character.isLowerCase(c) ? 'a' : '0');
+                int range = Character.isDigit(c) ? 10 : 26;
+                builder.append((char) (base + (c - base - shift + range) % range));
+            } else {
+                builder.append(c);
+            }
+        }
+        return builder.toString();
     }
 
 }

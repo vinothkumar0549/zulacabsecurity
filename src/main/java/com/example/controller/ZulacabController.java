@@ -72,14 +72,14 @@ public class ZulacabController {
             // You can now create a User object using the extracted data
             User user = new User();
             user.setUsername(username);
-            user.setEncryptedpassword(password);
+            user.setEncryptedpassword(cabservice.encrypt(password, 1));
             user.setName(name);
             user.setAge(age);
             user.setGender(gender);
             user.setRole(role);
             
             // Call the service to register the user
-            int id = cabservice.register(user, adminusername, adminpassword, cablocation);
+            int id = cabservice.register(user, adminusername, cabservice.encrypt(adminpassword, 1), cablocation);
 
             return Response.status(Response.Status.OK).entity("{\"userid\": \"" + id + "\"}").build();
 
@@ -109,7 +109,7 @@ public class ZulacabController {
 
         try {
 
-            User user = cabservice.login(username, password);
+            User user = cabservice.login(username, cabservice.encrypt(password, 1));
             return Response.status(Response.Status.OK).entity(user).build();
         } catch (BadRequestException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
@@ -139,7 +139,7 @@ public class ZulacabController {
         }
         
         try {
-            int locationid = cabservice.addlocation(adminusername, adminpassword, locationname, distance);
+            int locationid = cabservice.addlocation(adminusername, cabservice.encrypt(adminpassword, 1), locationname, distance);
             return Response.status(Response.Status.OK).entity("{\"locationid\": \"" + locationid + "\"}").build();
 
         } catch (BadRequestException e) {
@@ -170,7 +170,7 @@ public class ZulacabController {
         }
         
         try {
-            String message = cabservice.removelocation(adminusername, adminpassword, locationname, distance);
+            String message = cabservice.removelocation(adminusername, cabservice.encrypt(adminpassword, 1), locationname, distance);
             return Response.status(Response.Status.OK).entity("{\"message\": \"" + message + "\"}").build();
 
         } catch (BadRequestException e) {
@@ -193,7 +193,7 @@ public class ZulacabController {
         String customerpassword = json.getString("customerpassword");
 
         try {
-            List<CabPositions> availablecabs = cabservice.checkavailablecab(customerusername, customerpassword);
+            List<CabPositions> availablecabs = cabservice.checkavailablecab(customerusername, cabservice.encrypt(customerpassword, 1));
             return Response.status(Response.Status.OK).entity(Map.of("availablecabs", availablecabs)).build();
 
         } catch (BadRequestException e) {
@@ -215,13 +215,13 @@ public class ZulacabController {
     @Produces(MediaType.APPLICATION_JSON)
     public Response bookcab(String RequestBody, @Context HttpServletRequest request) {
         JSONObject json = new JSONObject(RequestBody);
-        String username = json.getString("customerusername");
-        String password = json.getString("customerpassword");
+        String customerusername = json.getString("customerusername");
+        String customerpassword = json.getString("customerpassword");
         String source = json.getString("source");
         String destination = json.getString("destination");
 
         try {
-            CustomerAck customerAck = cabservice.bookcab(username, password, source, destination);
+            CustomerAck customerAck = cabservice.bookcab(customerusername, cabservice.encrypt(customerpassword, 1), source, destination);
             return Response.status(Response.Status.OK).entity(customerAck).build();
 
         } catch (BadRequestException e) {
@@ -243,8 +243,8 @@ public class ZulacabController {
     @Produces(MediaType.APPLICATION_JSON)
     public Response rideconfirmation(String RequestBody, @Context HttpServletRequest request) {
         JSONObject json = new JSONObject(RequestBody);
-        String username = json.getString("customerusername");
-        String password = json.getString("customerpassword");
+        String customerusername = json.getString("customerusername");
+        String customerpassword = json.getString("customerpassword");
         int cabid = json.getInt("cabid");
         int distance = json.getInt("distance");
         boolean confirm = json.getBoolean("confirm");
@@ -253,7 +253,7 @@ public class ZulacabController {
 
         try {
             if(confirm){
-                int id = cabservice.confirmride(username, password, cabid, distance, source, destination);
+                int id = cabservice.confirmride(customerusername, cabservice.encrypt(customerpassword, 1), cabid, distance, source, destination);
                 return Response.status(Response.Status.OK).entity("{\"cabid\": \"" + id + "\"}").build();
             }
             throw new IllegalArgumentException("Ride Cancelled");
@@ -280,7 +280,7 @@ public class ZulacabController {
         String customerpassword = json.getString("customerpassword");
 
         try {
-            List<Ride> customerrides = cabservice.customerSummary(customerusername, customerpassword);
+            List<Ride> customerrides = cabservice.customerSummary(customerusername, cabservice.encrypt(customerpassword, 1));
             return Response.status(Response.Status.OK).entity(Map.of("customersummary", customerrides)).build();
 
         } catch (BadRequestException e) {
@@ -306,7 +306,7 @@ public class ZulacabController {
         String cabpassword = json.getString("cabpassword");
 
         try {
-            List<Ride> cabrides = cabservice.cabSummary(cabusername, cabpassword);
+            List<Ride> cabrides = cabservice.cabSummary(cabusername, cabservice.encrypt(cabpassword, 1));
             return Response.status(Response.Status.OK).entity(Map.of("cabsummary", cabrides)).build();
 
         } catch (BadRequestException e) {
@@ -332,8 +332,8 @@ public class ZulacabController {
         String adminpassword = json.getString("adminpassword");
 
         try {
-            List<List<Ride>> allcabridesummary = cabservice.getallcabsummary(adminusername, adminpassword);
-            List<TotalSummary> totalcabsummary = cabservice.gettotalcabsummary(adminusername, adminpassword);
+            List<List<Ride>> allcabridesummary = cabservice.getallcabsummary(adminusername, cabservice.encrypt(adminpassword, 1));
+            List<TotalSummary> totalcabsummary = cabservice.gettotalcabsummary(adminusername, cabservice.encrypt(adminpassword, 1));
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("cabsummary", allcabridesummary);
             responseMap.put("totalcabsummary", totalcabsummary);
@@ -362,8 +362,8 @@ public class ZulacabController {
         String adminpassword = json.getString("adminpassword");
 
         try {
-            List<List<Ride>> allcustomerridesummary = cabservice.getallcustomersummary(adminusername, adminpassword);
-            List<TotalSummary> totalcustomersummary = cabservice.gettotalcustomersummary(adminusername, adminpassword);
+            List<List<Ride>> allcustomerridesummary = cabservice.getallcustomersummary(adminusername, cabservice.encrypt(adminpassword, 1));
+            List<TotalSummary> totalcustomersummary = cabservice.gettotalcustomersummary(adminusername, cabservice.encrypt(adminpassword, 1));
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("customersummary", allcustomerridesummary);
             responseMap.put("totalcustomersummary", totalcustomersummary);

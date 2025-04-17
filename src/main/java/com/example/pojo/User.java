@@ -1,12 +1,15 @@
 package com.example.pojo;
 
 import com.example.util.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class User {
     
     private int userid;
     private String name;
     private String username;
+
+    @JsonProperty("password")
     private String encryptedpassword;
     private int age;
     private Gender gender;
