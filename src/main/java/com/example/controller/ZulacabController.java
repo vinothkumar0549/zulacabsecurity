@@ -1,8 +1,9 @@
 package com.example.controller;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import jakarta.servlet.http.Cookie;
 import org.json.*;
 import com.example.database.DatabaseStorage;
 import com.example.database.Storage;
@@ -12,9 +13,12 @@ import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
 import com.example.pojo.User;
 import com.example.service.CabService;
+import com.example.util.AuthUtil;
 import com.example.util.Gender;
 import com.example.util.Role;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -59,15 +63,16 @@ public class ZulacabController {
             int age = userJson.getInt("age");
             Gender gender = Gender.valueOf(userJson.getString("gender"));
             Role role = Role.valueOf(userJson.getString("role"));
-            String adminusername = null;
-            String adminpassword = null;
+            // String adminusername = null;
+            // String adminpassword = null;
             String cablocation = null;
             if( role == Role.CAB) {
                 // Extract userid and password
-            adminusername = json.getString("adminusername");
-            adminpassword = json.getString("adminpassword");
+            // adminusername = json.getString("adminusername");
+            // adminpassword = json.getString("adminpassword");
+            AuthUtil.validateSession(request, Role.ADMIN);
             cablocation = json.getString("cablocation");
-            adminpassword = cabservice.encrypt(adminpassword, 1);
+            //adminpassword = cabservice.encrypt(adminpassword, 1);
             }
 
             // You can now create a User object using the extracted data
@@ -80,7 +85,7 @@ public class ZulacabController {
             user.setRole(role);
             
             // Call the service to register the user
-            int id = cabservice.register(user, adminusername, adminpassword, cablocation);
+            int id = cabservice.register(user, cablocation);
 
             return Response.status(Response.Status.OK).entity("{\"userid\": \"" + id + "\"}").build();
 
@@ -111,6 +116,11 @@ public class ZulacabController {
         try {
 
             User user = cabservice.login(username, cabservice.encrypt(password, 1));
+
+            HttpSession session = request.getSession(true); // create session if not exists
+            session.setAttribute("user", user); // store user object (or userId)
+            session.setAttribute("role", user.getRole());
+
             return Response.status(Response.Status.OK).entity(user).build();
         } catch (BadRequestException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
@@ -130,17 +140,20 @@ public class ZulacabController {
 
         JSONObject json = new JSONObject(RequestBody);
 
-        String adminusername = json.getString("adminusername");
-        String adminpassword = json.getString("adminpassword");
+        // String adminusername = json.getString("adminusername");
+        // String adminpassword = json.getString("adminpassword");
         String locationname = json.getString("locationname");
         int distance = json.getInt("distance");
 
-        if(adminusername == null || adminpassword == null || locationname == null || distance == 0){
+        if(locationname == null || distance < 0){
             throw new IllegalArgumentException("Invalid input");
         }
         
         try {
-            int locationid = cabservice.addlocation(adminusername, cabservice.encrypt(adminpassword, 1), locationname, distance);
+            
+            AuthUtil.validateSession(request, Role.ADMIN);
+
+            int locationid = cabservice.addlocation( locationname, distance);
             return Response.status(Response.Status.OK).entity("{\"locationid\": \"" + locationid + "\"}").build();
 
         } catch (BadRequestException e) {
@@ -161,17 +174,20 @@ public class ZulacabController {
 
         JSONObject json = new JSONObject(RequestBody);
 
-        String adminusername = json.getString("adminusername");
-        String adminpassword = json.getString("adminpassword");
+        // String adminusername = json.getString("adminusername");
+        // String adminpassword = json.getString("adminpassword");
         String locationname = json.getString("locationname");
         int distance = json.getInt("distance");
 
-        if(adminusername == null || adminpassword == null || locationname == null || distance == 0){
+        if(locationname == null || distance < 0){
             throw new IllegalArgumentException("Invalid input");
         }
         
         try {
-            String message = cabservice.removelocation(adminusername, cabservice.encrypt(adminpassword, 1), locationname, distance);
+
+            AuthUtil.validateSession(request, Role.ADMIN);
+
+            String message = cabservice.removelocation(locationname, distance);
             return Response.status(Response.Status.OK).entity("{\"message\": \"" + message + "\"}").build();
 
         } catch (BadRequestException e) {
@@ -189,12 +205,13 @@ public class ZulacabController {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response checkavialablecab(String RequestBody, @Context HttpServletRequest request) {
-        JSONObject json = new JSONObject(RequestBody);
-        String customerusername = json.getString("customerusername");
-        String customerpassword = json.getString("customerpassword");
+        // JSONObject json = new JSONObject(RequestBody);
+        // String customerusername = json.getString("customerusername");
+        // String customerpassword = json.getString("customerpassword");
 
         try {
-            List<CabPositions> availablecabs = cabservice.checkavailablecab(customerusername, cabservice.encrypt(customerpassword, 1));
+            AuthUtil.validateSession(request, Role.CUSTOMER);
+            List<CabPositions> availablecabs = cabservice.checkavailablecab();
             return Response.status(Response.Status.OK).entity(Map.of("availablecabs", availablecabs)).build();
 
         } catch (BadRequestException e) {
@@ -216,13 +233,14 @@ public class ZulacabController {
     @Produces(MediaType.APPLICATION_JSON)
     public Response bookcab(String RequestBody, @Context HttpServletRequest request) {
         JSONObject json = new JSONObject(RequestBody);
-        String customerusername = json.getString("customerusername");
-        String customerpassword = json.getString("customerpassword");
+        // String customerusername = json.getString("customerusername");
+        // String customerpassword = json.getString("customerpassword");
         String source = json.getString("source");
         String destination = json.getString("destination");
 
         try {
-            CustomerAck customerAck = cabservice.bookcab(customerusername, cabservice.encrypt(customerpassword, 1), source, destination);
+            User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
+            CustomerAck customerAck = cabservice.bookcab(customer, source, destination);
             return Response.status(Response.Status.OK).entity(customerAck).build();
 
         } catch (BadRequestException e) {
@@ -244,8 +262,8 @@ public class ZulacabController {
     @Produces(MediaType.APPLICATION_JSON)
     public Response rideconfirmation(String RequestBody, @Context HttpServletRequest request) {
         JSONObject json = new JSONObject(RequestBody);
-        String customerusername = json.getString("customerusername");
-        String customerpassword = json.getString("customerpassword");
+        // String customerusername = json.getString("customerusername");
+        // String customerpassword = json.getString("customerpassword");
         int cabid = json.getInt("cabid");
         int distance = json.getInt("distance");
         boolean confirm = json.getBoolean("confirm");
@@ -253,8 +271,9 @@ public class ZulacabController {
         String destination = json.getString("destination");
 
         try {
+            User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
             if(confirm){
-                int id = cabservice.confirmride(customerusername, cabservice.encrypt(customerpassword, 1), cabid, distance, source, destination);
+                int id = cabservice.confirmride(customer, cabid, distance, source, destination);
                 return Response.status(Response.Status.OK).entity("{\"cabid\": \"" + id + "\"}").build();
             }
             throw new IllegalArgumentException("Ride Cancelled");
@@ -276,12 +295,13 @@ public class ZulacabController {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response customersummary(String RequestBody, @Context HttpServletRequest request) {
-        JSONObject json = new JSONObject(RequestBody);
-        String customerusername = json.getString("customerusername");
-        String customerpassword = json.getString("customerpassword");
+        // JSONObject json = new JSONObject(RequestBody);
+        // String customerusername = json.getString("customerusername");
+        // String customerpassword = json.getString("customerpassword");
 
         try {
-            List<Ride> customerrides = cabservice.customerSummary(customerusername, cabservice.encrypt(customerpassword, 1));
+            User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
+            List<Ride> customerrides = cabservice.customerSummary(customer);
             return Response.status(Response.Status.OK).entity(Map.of("customersummary", customerrides)).build();
 
         } catch (BadRequestException e) {
@@ -302,12 +322,13 @@ public class ZulacabController {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response cabsummary(String RequestBody, @Context HttpServletRequest request) {
-        JSONObject json = new JSONObject(RequestBody);
-        String cabusername = json.getString("cabusername");
-        String cabpassword = json.getString("cabpassword");
+        // JSONObject json = new JSONObject(RequestBody);
+        // String cabusername = json.getString("cabusername");
+        // String cabpassword = json.getString("cabpassword");
 
         try {
-            List<Ride> cabrides = cabservice.cabSummary(cabusername, cabservice.encrypt(cabpassword, 1));
+            User cab = AuthUtil.validateSession(request, Role.CAB);
+            List<Ride> cabrides = cabservice.cabSummary(cab);
             return Response.status(Response.Status.OK).entity(Map.of("cabsummary", cabrides)).build();
 
         } catch (BadRequestException e) {
@@ -328,13 +349,14 @@ public class ZulacabController {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getallcabsummary(String RequestBody, @Context HttpServletRequest request) {
-        JSONObject json = new JSONObject(RequestBody);
-        String adminusername = json.getString("adminusername");
-        String adminpassword = json.getString("adminpassword");
+        //JSONObject json = new JSONObject(RequestBody);
+        // String adminusername = json.getString("adminusername");
+        // String adminpassword = json.getString("adminpassword");
 
         try {
-            List<List<Ride>> allcabridesummary = cabservice.getallcabsummary(adminusername, cabservice.encrypt(adminpassword, 1));
-            List<TotalSummary> totalcabsummary = cabservice.gettotalcabsummary(adminusername, cabservice.encrypt(adminpassword, 1));
+            AuthUtil.validateSession(request, Role.ADMIN);
+            List<List<Ride>> allcabridesummary = cabservice.getallcabsummary();
+            List<TotalSummary> totalcabsummary = cabservice.gettotalcabsummary();
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("cabsummary", allcabridesummary);
             responseMap.put("totalcabsummary", totalcabsummary);
@@ -358,13 +380,14 @@ public class ZulacabController {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getallcustomersummary(String RequestBody, @Context HttpServletRequest request) {
-        JSONObject json = new JSONObject(RequestBody);
-        String adminusername = json.getString("adminusername");
-        String adminpassword = json.getString("adminpassword");
+        // JSONObject json = new JSONObject(RequestBody);
+        // String adminusername = json.getString("adminusername");
+        // String adminpassword = json.getString("adminpassword");
 
         try {
-            List<List<Ride>> allcustomerridesummary = cabservice.getallcustomersummary(adminusername, cabservice.encrypt(adminpassword, 1));
-            List<TotalSummary> totalcustomersummary = cabservice.gettotalcustomersummary(adminusername, cabservice.encrypt(adminpassword, 1));
+            AuthUtil.validateSession(request, Role.ADMIN);
+            List<List<Ride>> allcustomerridesummary = cabservice.getallcustomersummary();
+            List<TotalSummary> totalcustomersummary = cabservice.gettotalcustomersummary();
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("customersummary", allcustomerridesummary);
             responseMap.put("totalcustomersummary", totalcustomersummary);
@@ -382,6 +405,34 @@ public class ZulacabController {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
+
+    // @POST
+    // @Path("/logout")
+    // public Response logout(@Context HttpServletRequest request) {
+    //     HttpSession session = request.getSession(false);
+    //     if (session != null) {
+    //         session.invalidate();
+    //     }
+    //     return Response.ok("Logged out successfully").build();
+    // }
+
+    @POST
+@Path("/logout")
+public Response logout(@Context HttpServletRequest request, @Context HttpServletResponse response) {
+    HttpSession session = request.getSession(false);
+    if (session != null) {
+        session.invalidate();
+    }
+
+    // Instruct browser to delete the JSESSIONID cookie
+    Cookie cookie = new Cookie("JSESSIONID", null);
+    cookie.setMaxAge(0);         // Expire the cookie
+    cookie.setPath("/cab");         // IMPORTANT: must match original path
+    cookie.setHttpOnly(true);    // Optional but good practice
+    response.addCookie(cookie);  // Send the deletion command
+
+    return Response.ok("Logged out successfully").build();
+}
 
 }
 

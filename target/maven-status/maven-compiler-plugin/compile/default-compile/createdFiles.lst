@@ -1,3 +1,4 @@
+com\example\util\AuthUtil.class
 com\example\pojo\TotalSummary.class
 com\example\controller\ZulacabController.class
 com\example\util\Role.class
