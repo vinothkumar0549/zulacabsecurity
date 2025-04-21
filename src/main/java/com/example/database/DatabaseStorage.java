@@ -10,6 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
@@ -21,6 +24,8 @@ import com.example.util.Gender;
 import com.example.util.Role;
 
 public class DatabaseStorage implements Storage {
+
+    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     @Override
     public int addUser(User user) {
@@ -172,7 +177,8 @@ public class DatabaseStorage implements Storage {
 
     public List<CabPositions> checkAvailableCab() {
         String query = "SELECT l.locationname, GROUP_CONCAT(c.cabid ORDER BY c.cabid) AS cabids \r\n" +
-                        "FROM locations l JOIN cabpositions c ON l.locationid = c.locationid \r\n" + //
+                        "FROM locations l JOIN cabpositions c ON l.locationid = c.locationid \r\n" + 
+                        "WHERE c.cabstatus = 'AVAILABLE' \r\n" +
                         "GROUP BY l.locationname;";
 
         List<CabPositions> availablecabs = new ArrayList<>();
@@ -198,61 +204,131 @@ public class DatabaseStorage implements Storage {
     }
 
     public CustomerAck getFreeCab(int customerid, String source, String destination) {
-        
-        String query = "SELECT cp.cabid, ABS(src.distance - dest.distance) AS total_distance, COUNT(rd.rideid) AS trip_count \r\n" +
-                        "FROM cabpositions cp JOIN locations cl ON cp.locationid = cl.locationid \r\n"+
-                        "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS src \r\n" +
-                        "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS dest  \r\n" +
-                        "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid WHERE cp.cabid != IFNULL(( \r\n" +
-                        "SELECT cabid FROM ridedetails ORDER BY rideid DESC LIMIT 1), -1) \r\n" +
-                        "GROUP BY cp.cabid, cl.distance \r\n"+
-                        "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC LIMIT 1;";
+        String query = "SELECT cp.cabid, ABS(src.distance - dest.distance) AS total_distance, COUNT(rd.rideid) AS trip_count " +
+            "FROM cabpositions cp " +
+            "JOIN locations cl ON cp.locationid = cl.locationid " +
+            "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS src " +
+            "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS dest " +
+            "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid " +
+            "WHERE cp.cabid != IFNULL((SELECT cabid FROM ridedetails ORDER BY rideid DESC LIMIT 1), -1) " +
+            "AND cp.cabstatus = 'AVAILABLE' " +
+            "GROUP BY cp.cabid, cl.distance " +
+            "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC LIMIT 1 FOR UPDATE;";
     
- 
-
-        try (Connection connection = DatabaseConnection.getConnection();
-            PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-                
-            preparedStatement.setString(1, source);
-            preparedStatement.setString(2, destination);
-            ResultSet result = preparedStatement.executeQuery();
-            if (result.next()) {
-                System.out.println("\n\n\n\n\n\n\n\n\n\n\n Selected CAB ID: "+ result.getInt("cabid"));
-                return new CustomerAck(
-                    result.getInt("cabid"),
-                    result.getInt("total_distance"),
-                    (result.getInt("total_distance") * 10),
-                    source,
-                    destination
-                );
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            connection.setAutoCommit(false); // Start a transaction
+    
+            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+                preparedStatement.setString(1, source);
+                preparedStatement.setString(2, destination);
+                ResultSet result = preparedStatement.executeQuery();
+    
+                if (result.next()) {
+                    String cabId = result.getString("cabid");
+    
+                    // Update cab status to "WAIT"
+                    String updateQuery = "UPDATE cabpositions SET cabstatus = 'WAIT' WHERE cabid = ?";
+                    try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
+                        updateStmt.setInt(1, Integer.parseInt(cabId));
+                        updateStmt.executeUpdate();
+                    }
+    
+                    // Commit the transaction after successfully updating the cab status
+                    connection.commit();
+    
+                    // Schedule a task to release the cab if not confirmed within 1 minute
+                    scheduleAutoRelease(cabId);
+    
+                    System.out.println("Selected CAB ID: " + cabId);
+                    return new CustomerAck(
+                        Integer.parseInt(cabId),
+                        result.getInt("total_distance"),
+                        (result.getInt("total_distance") * 10),
+                        source,
+                        destination
+                    );
+                }
+            } catch (SQLException e) {
+                connection.rollback(); // Rollback if something goes wrong
+                e.printStackTrace();
             }
-                
         } catch (SQLException e) {
-            e.printStackTrace(); 
+            e.printStackTrace();
         }
-                
-        return null;
+    
+        return null; // Return null if no cab was found
     }
+    
+    // Method to schedule auto release of cab after a timeout
+    private void scheduleAutoRelease(String cabId) {
+        // Scheduled task to revert cab status after 1 minute
+        Runnable autoReleaseTask = new Runnable() {
+            @Override
+            public void run() {
+                try (Connection connection = DatabaseConnection.getConnection()) {
+                    String updateQuery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT'";
+                    try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
+                        updateStmt.setInt(1, Integer.parseInt(cabId));
+                        int rowsUpdated = updateStmt.executeUpdate();
+                        if (rowsUpdated > 0) {
+                            System.out.println("Cab " + cabId + " has been automatically released.");
+                        }
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+    
+        // Schedule the auto-release task to run after 1 minute
+        scheduler.schedule(autoReleaseTask, 1, TimeUnit.MINUTES);
+    }
+    
 
     public boolean addRideHistory(int customerid, int cabid, int distance, String source, String destination){
         String query = "INSERT INTO ridedetails(customerid, cabid, source, destination, fare, commission) VALUES (?,?,?,?,?,?)";
 
         try (Connection connection = DatabaseConnection.getConnection();
-        PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            PreparedStatement preparedStatement = connection.prepareStatement(query)) {
 
-       preparedStatement.setInt(1, customerid);
-       preparedStatement.setInt(2, cabid);
-       preparedStatement.setString(3, source);
-       preparedStatement.setString(4, destination);
-       preparedStatement.setInt(5, distance * 10);
-       preparedStatement.setInt(6, distance * 3);
+            preparedStatement.setInt(1, customerid);
+            preparedStatement.setInt(2, cabid);
+            preparedStatement.setString(3, source);
+            preparedStatement.setString(4, destination);
+            preparedStatement.setInt(5, distance * 10);
+            preparedStatement.setInt(6, distance * 3);
 
-       int val = preparedStatement.executeUpdate();
+            int val = preparedStatement.executeUpdate();
 
-       return val > 0;
+            String updateQuery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT';";
+            try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
+                updateStmt.setInt(1,cabid);
+                updateStmt.executeUpdate();
+            }
+
+            return val > 0;
 
         } catch (SQLException e) {
-            e.printStackTrace(); 
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    public boolean cancelRide(int cabid){
+        String query = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT';";
+
+        try (Connection connection = DatabaseConnection.getConnection();
+            PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            
+                preparedStatement.setInt(1, cabid);
+
+            int val = preparedStatement.executeUpdate();
+
+            return val > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
 
         return false;

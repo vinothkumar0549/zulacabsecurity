@@ -28,6 +28,8 @@ public interface Storage {
 
     public boolean addRideHistory(int customerid, int cabid, int distance, String source, String destination);
 
+    public boolean cancelRide(int cabid);
+
     public boolean updateCabPositions(int cabid, int locationid);
 
     public List<Ride> getCustomerRideSummary(int customerid);

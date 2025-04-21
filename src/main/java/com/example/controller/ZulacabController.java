@@ -291,6 +291,40 @@ public class ZulacabController {
     }
 
     @POST
+    @Path("/cancelride")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response cancelride(String RequestBody, @Context HttpServletRequest request) {
+        JSONObject json = new JSONObject(RequestBody);
+        // String customerusername = json.getString("customerusername");
+        // String customerpassword = json.getString("customerpassword");
+        int cabid = json.getInt("cabid");
+        // int distance = json.getInt("distance");
+        // boolean confirm = json.getBoolean("confirm");
+        // String source = json.getString("source");
+        // String destination = json.getString("destination");
+
+        try {
+
+            AuthUtil.validateSession(request, Role.CUSTOMER);
+            cabservice.cancelride(cabid);
+            return Response.status(Response.Status.OK).entity("{\"cancel\": \"" + cabid + "\"}").build();
+            
+        } catch (BadRequestException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (SecurityException e) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (IllegalStateException e) {
+            return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        }
+    }
+
+
+    @POST
     @Path("/customersummary")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)

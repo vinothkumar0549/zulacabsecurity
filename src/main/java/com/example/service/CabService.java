@@ -102,6 +102,12 @@ public class CabService {
         return cabid;    
     }
 
+    public boolean cancelride(int cabid) {
+        //User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
+        return storage.cancelRide(cabid);
+    
+    }
+
     public List<Ride> customerSummary(User customer) {
         //User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
         return storage.getCustomerRideSummary(customer.getUserid());
@@ -196,3 +202,26 @@ public class CabService {
 //                         "GROUP BY cp.cabid, cl.distance, src.distance, dest.distance\r\n" +
 //                         "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC\r\n" +
 //                         "LIMIT 1;";
+
+
+
+// String query = "SELECT cp.cabid, ABS(src.distance - dest.distance) AS total_distance, COUNT(rd.rideid) AS trip_count \r\n" +
+// "FROM cabpositions cp JOIN locations cl ON cp.locationid = cl.locationid \r\n"+
+// "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS src \r\n" +
+// "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS dest  \r\n" +
+// "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid WHERE cp.cabid != IFNULL(( \r\n" +
+// "SELECT cabid FROM ridedetails ORDER BY rideid DESC LIMIT 1), -1) \r\n" +
+// "GROUP BY cp.cabid, cl.distance \r\n"+
+// "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC LIMIT 1;";
+
+
+// String query = "SELECT cp.cabid, ABS(src.distance - dest.distance) AS total_distance, COUNT(rd.rideid) AS trip_count \r\n" +
+//             "FROM cabpositions cp \r\n" +
+//             "JOIN locations cl ON cp.locationid = cl.locationid \r\n" +
+//             "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS src \r\n" +
+//             "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS dest \r\n" +
+//             "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid \r\n" +
+//             "WHERE cp.cabid != IFNULL((SELECT cabid FROM ridedetails ORDER BY rideid DESC LIMIT 1), -1) \r\n" +
+//             "AND cp.cabstatus = 'AVAILABLE' \r\n" +
+//             "GROUP BY cp.cabid, cl.distance \r\n" +
+//             "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC LIMIT 1;";
