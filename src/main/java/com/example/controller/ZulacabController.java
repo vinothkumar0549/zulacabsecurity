@@ -1,5 +1,6 @@
 package com.example.controller;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,12 +67,14 @@ public class ZulacabController {
             // String adminusername = null;
             // String adminpassword = null;
             String cablocation = null;
+            String cabtype = null;
             if( role == Role.CAB) {
                 // Extract userid and password
             // adminusername = json.getString("adminusername");
             // adminpassword = json.getString("adminpassword");
             AuthUtil.validateSession(request, Role.ADMIN);
             cablocation = json.getString("cablocation");
+            cabtype = json.getString("cabtype");
             //adminpassword = cabservice.encrypt(adminpassword, 1);
             }
 
@@ -85,7 +88,7 @@ public class ZulacabController {
             user.setRole(role);
             
             // Call the service to register the user
-            int id = cabservice.register(user, cablocation);
+            int id = cabservice.register(user, cablocation, cabtype);
 
             return Response.status(Response.Status.OK).entity("{\"userid\": \"" + id + "\"}").build();
 
@@ -237,10 +240,27 @@ public class ZulacabController {
         // String customerpassword = json.getString("customerpassword");
         String source = json.getString("source");
         String destination = json.getString("destination");
+        String cabtype = json.getString("cabtype");
+        
+        // Extract datetime strings from JSON
+        String departureTimeStr = json.getString("departuretime");
+        String arrivalTimeStr = json.getString("arrivaltime");
+
+        // Convert string to LocalDateTime
+        LocalDateTime departuretime = LocalDateTime.parse(departureTimeStr);
+        LocalDateTime arrivaltime = LocalDateTime.parse(arrivalTimeStr);
+
+        
 
         try {
+            if (departuretime.isBefore(LocalDateTime.now())) {
+                throw new BadRequestException("Departure Date and Time not Valid");
+            }
+            if(arrivaltime.isBefore(departuretime)) {
+                throw new BadRequestException("Arrival Date and Time not Valid");
+            }
             User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
-            CustomerAck customerAck = cabservice.bookcab(customer, source, destination);
+            CustomerAck customerAck = cabservice.bookcab(customer, source, destination, cabtype, departuretime, arrivaltime);
             return Response.status(Response.Status.OK).entity(customerAck).build();
 
         } catch (BadRequestException e) {
@@ -270,10 +290,23 @@ public class ZulacabController {
         String source = json.getString("source");
         String destination = json.getString("destination");
 
+        // Extract datetime strings from JSON
+        String departureTimeStr = json.getString("departuretime");
+        String arrivalTimeStr = json.getString("arrivaltime");  
+        // Convert string to LocalDateTime
+        LocalDateTime departuretime = LocalDateTime.parse(departureTimeStr);
+        LocalDateTime arrivaltime = LocalDateTime.parse(arrivalTimeStr);
+
         try {
+            if (departuretime.isBefore(LocalDateTime.now())) {
+                throw new BadRequestException("Departure Date and Time not Valid");
+            }
+            if(arrivaltime.isBefore(departuretime)) {
+                throw new BadRequestException("Arrival Date and Time not Valid");
+            }
             User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
             if(confirm){
-                int id = cabservice.confirmride(customer, cabid, distance, source, destination);
+                int id = cabservice.confirmride(customer, cabid, distance, source, destination, departuretime, arrivaltime);
                 return Response.status(Response.Status.OK).entity("{\"cabid\": \"" + id + "\"}").build();
             }
             throw new IllegalArgumentException("Ride Cancelled");

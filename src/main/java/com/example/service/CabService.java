@@ -1,5 +1,6 @@
 package com.example.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.example.database.Storage;
@@ -35,7 +36,7 @@ public class CabService {
         return user;
     }
 
-    public int register(User user, String cablocation) {
+    public int register(User user, String cablocation, String cabtype) {
         int locationid = 0;
         if(user.getRole() == Role.CAB) {
             //validateUser(adminusername, adminpassword, Role.ADMIN);
@@ -47,7 +48,7 @@ public class CabService {
 
         int id = storage.addUser(user);
         if( id != -1 && user.getRole() == Role.CAB){
-            storage.addCabLocation(id, locationid);
+            storage.addCabLocation(id, locationid, cabtype);
         }
         return id;
     }
@@ -75,15 +76,18 @@ public class CabService {
         return storage.checkAvailableCab();
     }
 
-    public CustomerAck bookcab(User customer, String source, String destination) {
+    public CustomerAck bookcab(User customer, String source, String destination, String cabtype, LocalDateTime departuretime, LocalDateTime arrivaltime) {
 
         //User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
+        if(source.equals(destination)){
+            throw new IllegalArgumentException("Source and Destination are Same...");
+        }
 
         if(storage.checkLocation(source) == 0 || storage.checkLocation(destination) == 0){
             throw new IllegalArgumentException("Invalid Source or Destination");
         }
 
-        CustomerAck customerack = storage.getFreeCab(customer.getUserid(), source, destination);
+        CustomerAck customerack = storage.getFreeCab(customer.getUserid(), source, destination, cabtype, departuretime, arrivaltime);
 
         if(customerack == null){
             throw new IllegalStateException("No Cab Found");
@@ -95,9 +99,9 @@ public class CabService {
 
     }
 
-    public int confirmride(User customer, int cabid, int distance, String source, String destination) {
+    public int confirmride(User customer, int cabid, int distance, String source, String destination, LocalDateTime departuretime, LocalDateTime arrivaltime) {
         //User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
-        storage.addRideHistory(customer.getUserid(), cabid, distance, source, destination);
+        storage.addRideHistory(customer.getUserid(), cabid, distance, source, destination, departuretime, arrivaltime);
         storage.updateCabPositions(cabid, storage.checkLocation(destination));
         return cabid;    
     }

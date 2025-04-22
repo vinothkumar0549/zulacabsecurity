@@ -5,7 +5,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -87,15 +89,16 @@ public class DatabaseStorage implements Storage {
     }
 
     @Override
-    public boolean addCabLocation(int cabid, int  locationid) {
+    public boolean addCabLocation(int cabid, int  locationid, String cabtype) {
 
-        String cabpositionquery = "INSERT INTO cabpositions(cabid, locationid) VALUES(?,?)";
+        String cabpositionquery = "INSERT INTO cabpositions(cabid, locationid, cabtype) VALUES(?,?,?)";
 
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement preparedStatementcabposition = connection.prepareStatement(cabpositionquery)) {
 
             preparedStatementcabposition.setInt(1, cabid);
             preparedStatementcabposition.setInt(2, locationid);
+            preparedStatementcabposition.setString(3, cabtype);
             int val = preparedStatementcabposition.executeUpdate();
             return val > 0;
 
@@ -203,7 +206,7 @@ public class DatabaseStorage implements Storage {
         return availablecabs;
     }
 
-    public CustomerAck getFreeCab(int customerid, String source, String destination) {
+    public CustomerAck getFreeCab(int customerid, String source, String destination, String cabtype, LocalDateTime customerdeparturetime, LocalDateTime customerarrivaltime) {
         String query = "SELECT cp.cabid, ABS(src.distance - dest.distance) AS total_distance, COUNT(rd.rideid) AS trip_count " +
             "FROM cabpositions cp " +
             "JOIN locations cl ON cp.locationid = cl.locationid " +
@@ -211,7 +214,8 @@ public class DatabaseStorage implements Storage {
             "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS dest " +
             "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid " +
             "WHERE cp.cabid != IFNULL((SELECT cabid FROM ridedetails ORDER BY rideid DESC LIMIT 1), -1) " +
-            "AND cp.cabstatus = 'AVAILABLE' " +
+            "AND cp.cabstatus = 'AVAILABLE' AND cp.cabtype = ? " +
+            "AND cp.cabid NOT IN (SELECT cabid FROM ridedetails WHERE (departuretime < ? AND arrivaltime > ?)) " +
             "GROUP BY cp.cabid, cl.distance " +
             "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC LIMIT 1 FOR UPDATE;";
     
@@ -221,6 +225,9 @@ public class DatabaseStorage implements Storage {
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setString(1, source);
                 preparedStatement.setString(2, destination);
+                preparedStatement.setString(3, cabtype);
+                preparedStatement.setTimestamp(4, Timestamp.valueOf(customerarrivaltime));
+                preparedStatement.setTimestamp(5, Timestamp.valueOf(customerdeparturetime));
                 ResultSet result = preparedStatement.executeQuery();
     
                 if (result.next()) {
@@ -285,8 +292,8 @@ public class DatabaseStorage implements Storage {
     }
     
 
-    public boolean addRideHistory(int customerid, int cabid, int distance, String source, String destination){
-        String query = "INSERT INTO ridedetails(customerid, cabid, source, destination, fare, commission) VALUES (?,?,?,?,?,?)";
+    public boolean addRideHistory(int customerid, int cabid, int distance, String source, String destination, LocalDateTime departuretime, LocalDateTime arrivaltime){
+        String query = "INSERT INTO ridedetails(customerid, cabid, source, destination, fare, commission, departuretime, arrivaltime) VALUES (?,?,?,?,?,?,?,?)";
 
         try (Connection connection = DatabaseConnection.getConnection();
             PreparedStatement preparedStatement = connection.prepareStatement(query)) {
@@ -297,6 +304,8 @@ public class DatabaseStorage implements Storage {
             preparedStatement.setString(4, destination);
             preparedStatement.setInt(5, distance * 10);
             preparedStatement.setInt(6, distance * 3);
+            preparedStatement.setTimestamp(7, Timestamp.valueOf(departuretime));
+            preparedStatement.setTimestamp(8, Timestamp.valueOf(arrivaltime));
 
             int val = preparedStatement.executeUpdate();
 

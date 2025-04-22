@@ -1,5 +1,6 @@
 package com.example.database;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.example.pojo.User;
@@ -14,7 +15,7 @@ public interface Storage {
 
     public int addUser(User user);
 
-    public boolean addCabLocation(int cabid, int locationid);
+    public boolean addCabLocation(int cabid, int locationid, String cabtype);
 
     public int checkLocation(String cablocation);
 
@@ -24,9 +25,9 @@ public interface Storage {
 
     public List<CabPositions> checkAvailableCab();
 
-    public CustomerAck getFreeCab(int customerid, String source, String destination);
+    public CustomerAck getFreeCab(int customerid, String source, String destination, String cabtype, LocalDateTime departuretime, LocalDateTime arrivaltime);
 
-    public boolean addRideHistory(int customerid, int cabid, int distance, String source, String destination);
+    public boolean addRideHistory(int customerid, int cabid, int distance, String source, String destination, LocalDateTime departuretime, LocalDateTime arrivaltime);
 
     public boolean cancelRide(int cabid);
 
