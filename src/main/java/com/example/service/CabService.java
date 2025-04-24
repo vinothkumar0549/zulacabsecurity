@@ -6,6 +6,7 @@ import java.util.List;
 import com.example.database.Storage;
 import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
+import com.example.pojo.Penalty;
 import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
 import com.example.pojo.User;
@@ -106,15 +107,20 @@ public class CabService {
         return cabid;    
     }
 
-    public boolean cancelride(int cabid) {
+    public boolean cancelride(int cabid, int customerid) {
         //User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
-        return storage.cancelRide(cabid);
+        return storage.cancelRide(cabid, customerid);
     
     }
 
     public List<Ride> customerSummary(User customer) {
         //User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
         return storage.getCustomerRideSummary(customer.getUserid());
+    }
+
+    public List<Penalty> getpenalty(User customer) {
+        //User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
+        return storage.getPenalty(customer.getUserid());
     }
 
     public List<Ride> cabSummary(User cab) {

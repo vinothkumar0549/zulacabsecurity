@@ -6,6 +6,7 @@ import java.util.List;
 import com.example.pojo.User;
 import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
+import com.example.pojo.Penalty;
 import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
 
@@ -29,11 +30,13 @@ public interface Storage {
 
     public boolean addRideHistory(int customerid, int cabid, int distance, String source, String destination, LocalDateTime departuretime, LocalDateTime arrivaltime);
 
-    public boolean cancelRide(int cabid);
+    public boolean cancelRide(int cabid, int customerid);
 
     public boolean updateCabPositions(int cabid, int locationid);
 
     public List<Ride> getCustomerRideSummary(int customerid);
+
+    public List<Penalty> getPenalty(int customerid);
 
     public List<Ride> getCabRideSummary(int cabid);
 

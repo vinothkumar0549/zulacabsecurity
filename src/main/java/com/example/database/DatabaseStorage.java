@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
+import com.example.pojo.Penalty;
 import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
 import com.example.pojo.User;
@@ -231,12 +232,12 @@ public class DatabaseStorage implements Storage {
                 ResultSet result = preparedStatement.executeQuery();
     
                 if (result.next()) {
-                    String cabId = result.getString("cabid");
+                    int cabId = result.getInt("cabid");
     
                     // Update cab status to "WAIT"
                     String updateQuery = "UPDATE cabpositions SET cabstatus = 'WAIT' WHERE cabid = ?";
                     try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
-                        updateStmt.setInt(1, Integer.parseInt(cabId));
+                        updateStmt.setInt(1, cabId);
                         updateStmt.executeUpdate();
                     }
     
@@ -244,11 +245,11 @@ public class DatabaseStorage implements Storage {
                     connection.commit();
     
                     // Schedule a task to release the cab if not confirmed within 1 minute
-                    scheduleAutoRelease(cabId);
+                    scheduleAutoRelease(cabId, customerid);
     
                     System.out.println("Selected CAB ID: " + cabId);
                     return new CustomerAck(
-                        Integer.parseInt(cabId),
+                        cabId,
                         result.getInt("total_distance"),
                         (result.getInt("total_distance") * 10),
                         source,
@@ -267,7 +268,7 @@ public class DatabaseStorage implements Storage {
     }
     
     // Method to schedule auto release of cab after a timeout
-    private void scheduleAutoRelease(String cabId) {
+    private void scheduleAutoRelease(int cabId, int customerid) {
         // Scheduled task to revert cab status after 1 minute
         Runnable autoReleaseTask = new Runnable() {
             @Override
@@ -275,10 +276,19 @@ public class DatabaseStorage implements Storage {
                 try (Connection connection = DatabaseConnection.getConnection()) {
                     String updateQuery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT'";
                     try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
-                        updateStmt.setInt(1, Integer.parseInt(cabId));
+                        updateStmt.setInt(1, cabId);
                         int rowsUpdated = updateStmt.executeUpdate();
                         if (rowsUpdated > 0) {
                             System.out.println("Cab " + cabId + " has been automatically released.");
+                            String insertPenaltyQuery = "INSERT INTO customerdetails (customerid, penalty, date) VALUES (?, ?, ?);";
+                            try (PreparedStatement penaltyStatement = connection.prepareStatement(insertPenaltyQuery)) {
+                                penaltyStatement.setInt(1, customerid);
+                                penaltyStatement.setInt(2, 20);
+                                penaltyStatement.setDate(3, java.sql.Date.valueOf(java.time.LocalDate.now()));
+            
+                                penaltyStatement.executeUpdate();
+                            }
+
                         }
                     }
                 } catch (SQLException e) {
@@ -324,17 +334,29 @@ public class DatabaseStorage implements Storage {
         return false;
     }
 
-    public boolean cancelRide(int cabid){
-        String query = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT';";
+    public boolean cancelRide(int cabid, int customerid) {
+        String updatecabpositionquery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT';";
+        String insertPenaltyQuery = "INSERT INTO customerdetails (customerid, penalty, date) VALUES (?, ?, ?);";
+
 
         try (Connection connection = DatabaseConnection.getConnection();
-            PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            PreparedStatement preparedStatement = connection.prepareStatement(updatecabpositionquery)) {
             
                 preparedStatement.setInt(1, cabid);
 
             int val = preparedStatement.executeUpdate();
 
-            return val > 0;
+            if (val > 0) {
+                // If the cab status was updated successfully, insert the penalty record
+                try (PreparedStatement penaltyStatement = connection.prepareStatement(insertPenaltyQuery)) {
+                    penaltyStatement.setInt(1, customerid);
+                    penaltyStatement.setInt(2, 20);
+                    penaltyStatement.setDate(3, java.sql.Date.valueOf(java.time.LocalDate.now()));
+
+                    int penaltyResult = penaltyStatement.executeUpdate();
+                    return penaltyResult > 0;
+                }
+            }
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -391,6 +413,33 @@ public class DatabaseStorage implements Storage {
             e.printStackTrace(); 
         }
         return rides;
+    }
+
+    public List<Penalty> getPenalty(int customerid) {
+        String query = "SELECT penalty, date FROM  customerdetails WHERE customerid = ?";
+        List<Penalty> penalties = new ArrayList<>();
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+
+            preparedStatement.setInt(1, customerid);
+            ResultSet result = preparedStatement.executeQuery();
+
+            while (result.next()) {
+                // Create a new Ride object for each row
+                Penalty penalty = new Penalty(
+                    result.getInt("penalty"), // cabid
+                    result.getDate("date") // source
+                );
+    
+                // Add the ride to the list
+                penalties.add(penalty);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace(); 
+        }
+        return penalties;
     }
 
     public List<Ride> getCabRideSummary(int cabid){

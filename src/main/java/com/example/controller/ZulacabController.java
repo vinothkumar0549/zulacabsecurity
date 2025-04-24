@@ -10,6 +10,7 @@ import com.example.database.DatabaseStorage;
 import com.example.database.Storage;
 import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
+import com.example.pojo.Penalty;
 import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
 import com.example.pojo.User;
@@ -332,6 +333,7 @@ public class ZulacabController {
         // String customerusername = json.getString("customerusername");
         // String customerpassword = json.getString("customerpassword");
         int cabid = json.getInt("cabid");
+        int customerid = json.getInt("customerid");
         // int distance = json.getInt("distance");
         // boolean confirm = json.getBoolean("confirm");
         // String source = json.getString("source");
@@ -340,7 +342,7 @@ public class ZulacabController {
         try {
 
             AuthUtil.validateSession(request, Role.CUSTOMER);
-            cabservice.cancelride(cabid);
+            cabservice.cancelride(cabid, customerid);
             return Response.status(Response.Status.OK).entity("{\"cancel\": \"" + cabid + "\"}").build();
             
         } catch (BadRequestException e) {
@@ -370,6 +372,33 @@ public class ZulacabController {
             User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
             List<Ride> customerrides = cabservice.customerSummary(customer);
             return Response.status(Response.Status.OK).entity(Map.of("customersummary", customerrides)).build();
+
+        } catch (BadRequestException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (SecurityException e) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (IllegalStateException e) {
+            return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        }
+    }
+
+    @POST
+    @Path("/penalty")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response penalty(String RequestBody, @Context HttpServletRequest request) {
+        // JSONObject json = new JSONObject(RequestBody);
+        // String customerusername = json.getString("customerusername");
+        // String customerpassword = json.getString("customerpassword");
+
+        try {
+            User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
+            List<Penalty> penalties = cabservice.getpenalty(customer);
+            return Response.status(Response.Status.OK).entity(Map.of("penalty", penalties)).build();
 
         } catch (BadRequestException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
