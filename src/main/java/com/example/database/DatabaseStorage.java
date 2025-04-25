@@ -298,7 +298,7 @@ public class DatabaseStorage implements Storage {
         };
     
         // Schedule the auto-release task to run after 1 minute
-        scheduler.schedule(autoReleaseTask, 1, TimeUnit.MINUTES);
+        scheduler.schedule(autoReleaseTask, 5, TimeUnit.MINUTES);
     }
     
 

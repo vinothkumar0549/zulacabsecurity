@@ -7,6 +7,7 @@ public class CustomerAck {
     private int fare;
     private String source;
     private String destination;
+    private String roomid;
 
     public CustomerAck(int cabid, int distance, int fare, String source, String destination) {
         this.cabid = cabid;
@@ -56,6 +57,15 @@ public class CustomerAck {
         this.destination = destiantion;
     }
 
+    public String getRoomid() {
+        return roomid;
+    }
+
+    public void setRoomid(String roomid) {
+        this.roomid = roomid;
+    }
+
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -65,10 +75,12 @@ public class CustomerAck {
         sb.append("fare=").append(fare).append(", ");
         sb.append("source=").append(source).append(", ");
         sb.append("destination=").append(destination).append(", ");
+        sb.append("roomid").append(roomid).append(",");
         sb.append("]");
         return sb.toString();
     }
 
+  
     
 
 }

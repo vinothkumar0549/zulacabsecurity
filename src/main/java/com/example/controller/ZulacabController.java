@@ -18,6 +18,9 @@ import com.example.service.CabService;
 import com.example.util.AuthUtil;
 import com.example.util.Gender;
 import com.example.util.Role;
+import com.example.util.RoomIdGenerator;
+import com.example.websocket.DriverSocket;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -262,6 +265,9 @@ public class ZulacabController {
             }
             User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
             CustomerAck customerAck = cabservice.bookcab(customer, source, destination, cabtype, departuretime, arrivaltime);
+            String roomid = RoomIdGenerator.generateRoomId();
+            customerAck.setRoomid(roomid);
+            DriverSocket.sendRideAssignment(String.valueOf(customerAck.getCabid()), customerAck.getRoomid(), source, destination); 
             return Response.status(Response.Status.OK).entity(customerAck).build();
 
         } catch (BadRequestException e) {

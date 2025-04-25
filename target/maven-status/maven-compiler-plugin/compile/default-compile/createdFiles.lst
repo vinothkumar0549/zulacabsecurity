@@ -4,7 +4,10 @@ com\example\controller\ZulacabController.class
 com\example\util\Role.class
 com\example\database\DatabaseStorage$1.class
 com\example\pojo\CabPositions.class
+com\example\websocket\ChatEndpoint.class
 com\example\pojo\CustomerAck.class
+com\example\util\RoomIdGenerator.class
+com\example\websocket\DriverSocket.class
 com\example\pojo\Ride.class
 com\example\util\DatabaseConnection.class
 com\example\service\CabService.class
