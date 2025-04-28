@@ -5,33 +5,30 @@ import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
 import java.util.concurrent.ConcurrentHashMap;
 
-@ServerEndpoint("/driver/{driverId}")
+@ServerEndpoint("/cab/{cabid}")
 public class DriverSocket {
 
     // Map to store connected drivers (driverId -> session)
     private static ConcurrentHashMap<String, Session> driverSessions = new ConcurrentHashMap<>();
 
     @OnOpen
-    public void onOpen(Session session, @PathParam("driverId") String driverId) {
-        System.out.println("Driver connected: " + session);
-        driverSessions.put(driverId, session);
+    public void onOpen(Session session, @PathParam("cabid") String cabid) {
+        driverSessions.put(cabid, session);
     }
 
     @OnMessage
-    public void onMessage(String message, @PathParam("driverId") String driverId) {
-        System.out.println("Received from driver " + driverId + ": " + message);
+    public void onMessage(String message, @PathParam("cabid") String cabid) {
         // Usually drivers don’t send messages here unless responding.
     }
 
     @OnClose
-    public void onClose(Session session, @PathParam("driverId") String driverId) {
-        System.out.println("Driver disconnected: " + driverId);
-        driverSessions.remove(driverId);
+    public void onClose(Session session, @PathParam("cabid") String cabid) {
+        driverSessions.remove(cabid);
     }
 
     @OnError
-    public void onError(Session session, Throwable throwable, @PathParam("driverId") String driverId) {
-        System.out.println("Error with driver " + driverId + ": " + throwable.getMessage());
+    public void onError(Session session, Throwable throwable, @PathParam("cabid") String cabid) {
+        System.out.println("Error with Cab " + cabid + ": " + throwable.getMessage());
     }
 
     // Static method to send a message to a driver
@@ -44,7 +41,6 @@ public class DriverSocket {
             );
             try {
                 session.getBasicRemote().sendText(jsonMessage);
-                System.out.println("Ride assigned to Cab " + cabid);
             } catch (Exception e) {
                 e.printStackTrace();
             }

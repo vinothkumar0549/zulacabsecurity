@@ -11,6 +11,7 @@ import com.example.pojo.Ride;
 import com.example.pojo.TotalSummary;
 import com.example.pojo.User;
 import com.example.util.Role;
+import com.example.websocket.DriverSocket;
 
 import jakarta.ws.rs.BadRequestException;
 
@@ -104,11 +105,13 @@ public class CabService {
         //User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
         storage.addRideHistory(customer.getUserid(), cabid, distance, source, destination, departuretime, arrivaltime);
         storage.updateCabPositions(cabid, storage.checkLocation(destination));
+        DriverSocket.sendCloseRequest(String.valueOf(cabid));
         return cabid;    
     }
 
     public boolean cancelride(int cabid, int customerid) {
         //User customer = validateUser(customerusername, customerpassword, Role.CUSTOMER);
+        DriverSocket.sendCloseRequest(String.valueOf(cabid));
         return storage.cancelRide(cabid, customerid);
     
     }

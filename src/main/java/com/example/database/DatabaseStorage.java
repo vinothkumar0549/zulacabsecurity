@@ -25,10 +25,11 @@ import com.example.pojo.User;
 import com.example.util.DatabaseConnection;
 import com.example.util.Gender;
 import com.example.util.Role;
+import com.example.websocket.DriverSocket;
 
 public class DatabaseStorage implements Storage {
 
-    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
 
     @Override
     public int addUser(User user) {
@@ -280,6 +281,7 @@ public class DatabaseStorage implements Storage {
                         int rowsUpdated = updateStmt.executeUpdate();
                         if (rowsUpdated > 0) {
                             System.out.println("Cab " + cabId + " has been automatically released.");
+                            DriverSocket.sendCloseRequest(String.valueOf(cabId));
                             String insertPenaltyQuery = "INSERT INTO customerdetails (customerid, penalty, date) VALUES (?, ?, ?);";
                             try (PreparedStatement penaltyStatement = connection.prepareStatement(insertPenaltyQuery)) {
                                 penaltyStatement.setInt(1, customerid);

@@ -10,7 +10,7 @@ import jakarta.websocket.Session;
 import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
 
-@ServerEndpoint("/chat/{roomId}")
+@ServerEndpoint("/chat/{roomId}/{role}/{userid}")
 public class ChatEndpoint {
 
     // Map<roomId, List<Session>>
@@ -18,34 +18,32 @@ public class ChatEndpoint {
 
 
     @OnOpen
-    public void onOpen(Session session, @PathParam("roomId") String roomId) {
-        System.out.println("Chat Connected Successfully with "+ roomId);
-
+    public void onOpen(Session session, @PathParam("roomId") String roomId, @PathParam ("role") String role, @PathParam("userid") String userid) {
+     
         chatRooms.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet()).add(session);
-
-        System.out.println("Session" + chatRooms);
+        session.getUserProperties().put("roomid", roomId);
+        session.getUserProperties().put("role", role);
+        session.getUserProperties().put("userid", userid);
+        System.out.println(session);
 
     }
 
     @OnMessage
     public void onMessage(String message, Session sender, @PathParam("roomId") String roomId) {
-        System.out.println("Session" + chatRooms);
-        System.out.println("Message:"+ message);
-        System.out.println("Sender:"+ sender);
-        System.out.println("Roomid:"+ roomId);
 
         // Broadcast to all users in the same room
         for (Session session : chatRooms.getOrDefault(roomId, Set.of())) {
             if (session.isOpen()) {
-                System.out.println("CHECK");
                 session.getAsyncRemote().sendText(message);
             }
         }
     }
 
     @OnClose
-    public void onClose(Session session, @PathParam("roomId") String roomId) {
-        System.out.println("CLOSE CONNECTION");
+    public void onClose(Session session, @PathParam("roomId") String roomId, @PathParam ("role") String role, @PathParam("userid") String userid) {
+        // if(Role.valueOf((String) session.getUserProperties().get("role")) == Role.CAB){
+        //     DriverSocket.sendCloseRequest((String) session.getUserProperties().get("userid"));
+        // }
         Set<Session> roomSessions = chatRooms.get(roomId);
         if (roomSessions != null) {
             roomSessions.remove(session);
@@ -53,5 +51,7 @@ public class ChatEndpoint {
                 chatRooms.remove(roomId);
             }
         }
+        System.out.println("CLOSE CONNECTION "+ session);
+        System.out.println(roomSessions.isEmpty());
     }
 }
