@@ -533,7 +533,7 @@ public Response logout(@Context HttpServletRequest request, @Context HttpServlet
     cookie.setHttpOnly(true);    // Optional but good practice
     response.addCookie(cookie);  // Send the deletion command
 
-    return Response.ok("Logged out successfully").build();
+    return Response.ok("{\"message\": \"Logout Successfully\"}").build();
 }
 
 }
