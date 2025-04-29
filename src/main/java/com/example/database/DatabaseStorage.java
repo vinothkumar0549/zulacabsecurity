@@ -12,8 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.example.pojo.CabPositions;
@@ -30,6 +32,7 @@ import com.example.websocket.DriverSocket;
 public class DatabaseStorage implements Storage {
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
+    private static final Map<Integer, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
     @Override
     public int addUser(User user) {
@@ -295,12 +298,15 @@ public class DatabaseStorage implements Storage {
                     }
                 } catch (SQLException e) {
                     e.printStackTrace();
+                } finally {
+                    scheduledTasks.remove(cabId); // clean up after running
                 }
             }
         };
     
-        // Schedule the auto-release task to run after 5 minute
-        scheduler.schedule(autoReleaseTask, 2, TimeUnit.MINUTES);
+        // Schedule the auto-release task to run after 2 minute
+        ScheduledFuture<?> future = scheduler.schedule(autoReleaseTask, 2, TimeUnit.MINUTES);
+        scheduledTasks.put(cabId, future);    
     }
     
 
@@ -326,7 +332,10 @@ public class DatabaseStorage implements Storage {
                 updateStmt.setInt(1,cabid);
                 updateStmt.executeUpdate();
             }
-
+            ScheduledFuture<?> future = scheduledTasks.remove(cabid);
+            if (future != null) {
+                future.cancel(false);
+            }
             return val > 0;
 
         } catch (SQLException e) {
@@ -356,7 +365,13 @@ public class DatabaseStorage implements Storage {
                     penaltyStatement.setDate(3, java.sql.Date.valueOf(java.time.LocalDate.now()));
 
                     int penaltyResult = penaltyStatement.executeUpdate();
+
+                    ScheduledFuture<?> future = scheduledTasks.remove(cabid);
+                    if (future != null) {
+                        future.cancel(false);
+                    }
                     return penaltyResult > 0;
+
                 }
             }
 
