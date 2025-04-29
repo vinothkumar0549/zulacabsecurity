@@ -94,6 +94,48 @@ public class DatabaseStorage implements Storage {
     }
 
     @Override
+    public boolean login(int userid){
+        String query = "UPDATE users SET onlinestatus = ? WHERE userid = ?";
+
+        try (Connection connection = DatabaseConnection.getConnection();
+        PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+
+       preparedStatement.setBoolean(1, true);
+       preparedStatement.setInt(2, userid);
+
+       int val = preparedStatement.executeUpdate();
+
+       return val > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace(); 
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean logout(int userid){
+        String query = "UPDATE users SET onlinestatus = ? WHERE userid = ?";
+
+        try (Connection connection = DatabaseConnection.getConnection();
+        PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+
+       preparedStatement.setBoolean(1, false);
+       preparedStatement.setInt(2, userid);
+
+       int val = preparedStatement.executeUpdate();
+
+       return val > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace(); 
+        }
+
+        return false;
+    }
+
+    @Override
     public boolean addCabLocation(int cabid, int  locationid, String cabtype) {
 
         String cabpositionquery = "INSERT INTO cabpositions(cabid, locationid, cabtype) VALUES(?,?,?)";
@@ -214,12 +256,14 @@ public class DatabaseStorage implements Storage {
     public CustomerAck getFreeCab(int customerid, String source, String destination, String cabtype, LocalDateTime customerdeparturetime, LocalDateTime customerarrivaltime) {
         String query = "SELECT cp.cabid, ABS(src.distance - dest.distance) AS total_distance, COUNT(rd.rideid) AS trip_count " +
             "FROM cabpositions cp " +
+            "JOIN users u ON cp.cabid = u.userid " +  // Join with users to check online status
             "JOIN locations cl ON cp.locationid = cl.locationid " +
             "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS src " +
             "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS dest " +
             "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid " +
             "WHERE cp.cabid != IFNULL((SELECT cabid FROM ridedetails ORDER BY rideid DESC LIMIT 1), -1) " +
             "AND cp.cabstatus = 'AVAILABLE' AND cp.cabtype = ? " +
+            "AND u.onlinestatus = TRUE " +  // Check if the driver is online
             "AND cp.cabid NOT IN (SELECT cabid FROM ridedetails WHERE (departuretime < ? AND arrivaltime > ?)) " +
             "GROUP BY cp.cabid, cl.distance " +
             "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC LIMIT 1 FOR UPDATE;";

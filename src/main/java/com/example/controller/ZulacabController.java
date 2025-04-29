@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import jakarta.servlet.http.Cookie;
+// import jakarta.servlet.http.Cookie;
 import org.json.*;
 import com.example.database.DatabaseStorage;
 import com.example.database.Storage;
@@ -519,22 +519,25 @@ public class ZulacabController {
     // }
 
     @POST
-@Path("/logout")
-public Response logout(@Context HttpServletRequest request, @Context HttpServletResponse response) {
-    HttpSession session = request.getSession(false);
-    if (session != null) {
-        session.invalidate();
+    @Path("/logout")
+    public Response logout(String RequestBody, @Context HttpServletRequest request, @Context HttpServletResponse response) {
+        JSONObject json = new JSONObject(RequestBody);
+        int userid = json.getInt("userid");
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        response.addCookie(cabservice.logout(userid));
+    
+        // // Instruct browser to delete the JSESSIONID cookie
+        // Cookie cookie = new Cookie("JSESSIONID", null);
+        // cookie.setMaxAge(0);         // Expire the cookie
+        // cookie.setPath("/cab");         // IMPORTANT: must match original path
+        // cookie.setHttpOnly(true);    // Optional but good practice
+        // response.addCookie(cookie);  // Send the deletion command
+
+        return Response.ok("{\"message\": \"Logout Successfully\"}").build();
     }
-
-    // Instruct browser to delete the JSESSIONID cookie
-    Cookie cookie = new Cookie("JSESSIONID", null);
-    cookie.setMaxAge(0);         // Expire the cookie
-    cookie.setPath("/cab");         // IMPORTANT: must match original path
-    cookie.setHttpOnly(true);    // Optional but good practice
-    response.addCookie(cookie);  // Send the deletion command
-
-    return Response.ok("{\"message\": \"Logout Successfully\"}").build();
-}
 
 }
 

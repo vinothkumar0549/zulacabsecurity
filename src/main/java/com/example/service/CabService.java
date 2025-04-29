@@ -13,6 +13,7 @@ import com.example.pojo.User;
 import com.example.util.Role;
 import com.example.websocket.DriverSocket;
 
+import jakarta.servlet.http.Cookie;
 import jakarta.ws.rs.BadRequestException;
 
 public class CabService {
@@ -35,7 +36,19 @@ public class CabService {
         }
         user.setEncryptedpassword(decrypt(password, 1));
         //user.setEncryptedpassword(null);
+        storage.login(user.getUserid());
         return user;
+    }
+
+    public Cookie logout(int userid) {
+
+        // Instruct browser to delete the JSESSIONID cookie
+        Cookie cookie = new Cookie("JSESSIONID", null);
+        cookie.setMaxAge(0);         // Expire the cookie
+        cookie.setPath("/cab");         // IMPORTANT: must match original path
+        cookie.setHttpOnly(true);    // Optional but good practice
+        storage.logout(userid);
+        return cookie;
     }
 
     public int register(User user, String cablocation, String cabtype) {

@@ -14,6 +14,10 @@ public interface Storage {
 
     public User getUser(String username);
 
+    public boolean login(int userid);
+
+    public boolean logout(int userid);
+
     public int addUser(User user);
 
     public boolean addCabLocation(int cabid, int locationid, String cabtype);
