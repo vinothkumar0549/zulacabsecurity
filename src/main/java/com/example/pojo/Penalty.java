@@ -1,6 +1,6 @@
 package com.example.pojo;
 
-import java.sql.Date;
+import java.time.LocalDate;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 
@@ -10,18 +10,18 @@ public class Penalty {
     private int penalty;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd-MM-yyyy")
-    private Date date;
+    private LocalDate date;
 
     public Penalty() {
 
     }
 
-    public Penalty(int penalty, Date date) {
+    public Penalty(int penalty, LocalDate date) {
         this.penalty = penalty;
         this.date = date;
     }
     
-    public Penalty(int customerid, int penalty, Date date) {
+    public Penalty(int customerid, int penalty, LocalDate date) {
         this.customerid = customerid;
         this.penalty = penalty;
         this.date = date;
@@ -43,11 +43,11 @@ public class Penalty {
         this.penalty = penalty;
     }
 
-    public Date getDate() {
+    public LocalDate getDate() {
         return date;
     }
 
-    public void setDate(Date date) {
+    public void setDate(LocalDate date) {
         this.date = date;
     }
 

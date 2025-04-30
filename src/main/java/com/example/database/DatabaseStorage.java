@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -490,7 +491,8 @@ public class DatabaseStorage implements Storage {
                 // Create a new Ride object for each row
                 Penalty penalty = new Penalty(
                     result.getInt("penalty"), // cabid
-                    result.getDate("date") // source
+                    //result.getDate("date") // source
+                    result.getObject("date", LocalDate.class)
                 );
     
                 // Add the ride to the list

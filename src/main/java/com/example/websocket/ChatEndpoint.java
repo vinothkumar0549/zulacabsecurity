@@ -21,9 +21,9 @@ public class ChatEndpoint {
     public void onOpen(Session session, @PathParam("roomId") String roomId, @PathParam ("role") String role, @PathParam("userid") String userid) {
      
         chatRooms.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet()).add(session);
-        session.getUserProperties().put("roomid", roomId);
-        session.getUserProperties().put("role", role);
-        session.getUserProperties().put("userid", userid);
+        // session.getUserProperties().put("roomid", roomId);
+        // session.getUserProperties().put("role", role);
+        // session.getUserProperties().put("userid", userid);
         System.out.println(session);
 
     }
