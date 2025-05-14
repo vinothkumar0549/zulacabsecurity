@@ -1,8 +1,8 @@
 com\example\util\AuthUtil.class
 com\example\pojo\TotalSummary.class
+com\example\util\ShardManager.class
 com\example\controller\ZulacabController.class
 com\example\util\Role.class
-com\example\database\DatabaseStorage$1.class
 com\example\pojo\CabPositions.class
 com\example\websocket\ChatEndpoint.class
 com\example\pojo\CustomerAck.class

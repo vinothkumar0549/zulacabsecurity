@@ -3,6 +3,8 @@ package com.example.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.mindrot.jbcrypt.BCrypt;
+
 import com.example.database.Storage;
 import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
@@ -31,10 +33,10 @@ public class CabService {
             throw new BadRequestException("User Not Found");
         }
 
-        if(! user.getEncryptedpassword().equals(password)) {
+        if(! BCrypt.checkpw(password, user.getEncryptedpassword())) {
             throw new SecurityException("Invalid Password");
         }
-        user.setEncryptedpassword(decrypt(password, 1));
+        user.setEncryptedpassword(password);
         //user.setEncryptedpassword(null);
         storage.login(user.getUserid());
         return user;

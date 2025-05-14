@@ -1,15 +1,20 @@
 package com.example.database;
 
 import java.sql.CallableStatement;
+// import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+// import java.sql.Types;
 import java.time.LocalDate;
+// import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+// import java.util.Collections;
+// import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -18,6 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+// import java.util.stream.Collectors;
 
 import com.example.pojo.CabPositions;
 import com.example.pojo.CustomerAck;
@@ -28,39 +34,44 @@ import com.example.pojo.User;
 import com.example.util.DatabaseConnection;
 import com.example.util.Gender;
 import com.example.util.Role;
+// import com.example.websocket.DriverSocket;
 import com.example.websocket.DriverSocket;
 
+
 public class DatabaseStorage implements Storage {
+
+    private static int userid = 9;
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
     private static final Map<Integer, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
     @Override
     public int addUser(User user) {
-        String insertuser = "INSERT INTO users (name, username, password, age, gender, role) VALUES (?,?,?,?,?,?)";
-        int generatedUserId = -1;
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement preparedStatementuser = connection.prepareStatement(insertuser, PreparedStatement.RETURN_GENERATED_KEYS)) {
+        String insertuser = "INSERT INTO users (userid, name, username, password, age, gender, role) VALUES (?,?,?,?,?,?,?)";
+        // int generatedUserId = -1;
+        userid++;
+        try (Connection connection = DatabaseConnection.getShardConnection(userid);
+             PreparedStatement preparedStatementuser = connection.prepareStatement(insertuser)) {
 
-            preparedStatementuser.setString(1, user.getName());
-            preparedStatementuser.setString(2, user.getUsername());
-            preparedStatementuser.setString(3, user.getEncryptedpassword());
-            preparedStatementuser.setLong(4, user.getAge());
-            preparedStatementuser.setString(5, user.getGender().name());
-            preparedStatementuser.setString(6, user.getRole().name()); 
+            preparedStatementuser.setInt(1, userid);
+            preparedStatementuser.setString(2, user.getName());
+            preparedStatementuser.setString(3, user.getUsername());
+            preparedStatementuser.setString(4, user.getEncryptedpassword());
+            preparedStatementuser.setLong(5, user.getAge());
+            preparedStatementuser.setString(6, user.getGender().name());
+            preparedStatementuser.setString(7, user.getRole().name()); 
 
             int val = preparedStatementuser.executeUpdate();
 
-            if (val != 0) {
-                // Get the generated primary key (userid)
-                try (ResultSet generatedKeys = preparedStatementuser.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        generatedUserId = generatedKeys.getInt(1); // Retrieve the generated ID
-                    }
-                }
+             if (val != 0) {
+                return userid;
+            //     // Get the generated primary key (userid)
+            //     try (ResultSet generatedKeys = preparedStatementuser.getGeneratedKeys()) {
+            //         if (generatedKeys.next()) {
+            //             generatedUserId = generatedKeys.getInt(1); // Retrieve the generated ID
+            //         }
+            //     }
             }
-
-            return generatedUserId;
 
         } catch (SQLException e) {
             e.printStackTrace(); 
@@ -71,68 +82,69 @@ public class DatabaseStorage implements Storage {
     @Override
     public User getUser(String username) {
         String query = "SELECT * FROM users WHERE username = ?";
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(query)) {
 
-            preparedStatement.setString(1, username);
-            ResultSet result = preparedStatement.executeQuery();
+        try {
+            for (Connection connection : DatabaseConnection.getAllUserShardConnections()) {
+                try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
 
-            if (result.next()) {
-                return new User(
-                result.getInt("userid"), 
-                result.getString("name"), 
-                result.getString("username"),
-                result.getString("password"),
-                result.getInt("age"),
-                Gender.valueOf(result.getString("gender")),
-                Role.valueOf(result.getString("role")));  
+                    preparedStatement.setString(1, username);
+                    ResultSet result = preparedStatement.executeQuery();
+
+                    if (result.next()) {
+                        return new User(
+                            result.getInt("userid"),
+                            result.getString("name"),
+                            result.getString("username"),
+                            result.getString("password"),
+                            result.getInt("age"),
+                            Gender.valueOf(result.getString("gender")),
+                            Role.valueOf(result.getString("role"))
+                        );
+                    }
+
+                } catch (SQLException e) {
+                    e.printStackTrace(); // You could log and continue
+                } finally {
+                    try {
+                        if (connection != null && !connection.isClosed()) connection.close();
+                    } catch (SQLException ex) {
+                        ex.printStackTrace();
+                    }
+                }
             }
-
         } catch (SQLException e) {
-            e.printStackTrace(); 
+            e.printStackTrace();
         }
-        return null;
-    }
+
+         return null; // No user found in any shard
+     }
+
 
     @Override
     public boolean login(int userid){
-        String query = "UPDATE users SET onlinestatus = ? WHERE userid = ?";
-
-        try (Connection connection = DatabaseConnection.getConnection();
-        PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-
-       preparedStatement.setBoolean(1, true);
-       preparedStatement.setInt(2, userid);
-
-       int val = preparedStatement.executeUpdate();
-
-       return val > 0;
-
+        String query = "INSERT INTO onlinestatus (userid) VALUES (?)";
+        try (Connection connection = DatabaseConnection.getOnlineStatusConnection(); 
+            PreparedStatement ps = connection.prepareStatement(query)) {
+            ps.setInt(1, userid);
+            ps.executeUpdate();
+            return true;
         } catch (SQLException e) {
-            e.printStackTrace(); 
+            e.printStackTrace();
         }
-
         return false;
     }
 
     @Override
     public boolean logout(int userid){
-        String query = "UPDATE users SET onlinestatus = ? WHERE userid = ?";
-
-        try (Connection connection = DatabaseConnection.getConnection();
-        PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-
-       preparedStatement.setBoolean(1, false);
-       preparedStatement.setInt(2, userid);
-
-       int val = preparedStatement.executeUpdate();
-
-       return val > 0;
-
+        String query = "DELETE FROM onlinestatus WHERE userid = ?";
+        try (Connection connection = DatabaseConnection.getOnlineStatusConnection(); 
+             PreparedStatement ps = connection.prepareStatement(query)) {
+            ps.setInt(1, userid);
+            ps.executeUpdate();
+            return true;
         } catch (SQLException e) {
-            e.printStackTrace(); 
+            e.printStackTrace();
         }
-
         return false;
     }
 
@@ -141,7 +153,7 @@ public class DatabaseStorage implements Storage {
 
         String cabpositionquery = "INSERT INTO cabpositions(cabid, locationid, cabtype) VALUES(?,?,?)";
 
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getCabPositionConnection();
              PreparedStatement preparedStatementcabposition = connection.prepareStatement(cabpositionquery)) {
 
             preparedStatementcabposition.setInt(1, cabid);
@@ -161,15 +173,15 @@ public class DatabaseStorage implements Storage {
     public int checkLocation(String cablocation) {
         String locationquery = "SELECT locationid FROM locations WHERE locationname = ?";
 
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getLocationConnection();
         PreparedStatement preparedStatementlocation = connection.prepareStatement(locationquery)) {
 
-       preparedStatementlocation.setString(1, cablocation);
-       ResultSet result = preparedStatementlocation.executeQuery();
+            preparedStatementlocation.setString(1, cablocation);
+            ResultSet result = preparedStatementlocation.executeQuery();
 
-       if (result.next()) {
-           return result.getInt("locationid");
-       }
+            if (result.next()) {
+                return result.getInt("locationid");
+            }
 
         } catch (SQLException e) {
             e.printStackTrace(); 
@@ -182,7 +194,7 @@ public class DatabaseStorage implements Storage {
         String query = "INSERT INTO locations(locationname, distance) VALUES (?,?)";
         int generatedUserId = -1;
 
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getLocationConnection();
         PreparedStatement preparedStatement = connection.prepareStatement(query,  PreparedStatement.RETURN_GENERATED_KEYS)) {
 
        preparedStatement.setString(1, locationname);
@@ -208,8 +220,7 @@ public class DatabaseStorage implements Storage {
     }
 
     public String removeLocation(String locationname, int distance) {
-
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getLocationConnection();
             CallableStatement callablestatement = connection.prepareCall("{call remove_location(?, ?, ?)}")) {
 
             callablestatement.setString(1, locationname);
@@ -224,17 +235,18 @@ public class DatabaseStorage implements Storage {
         }
 
         return null;
-    }
+    }    
 
     public List<CabPositions> checkAvailableCab() {
-        String query = "SELECT l.locationname, GROUP_CONCAT(c.cabid ORDER BY c.cabid) AS cabids \r\n" +
-                        "FROM locations l JOIN cabpositions c ON l.locationid = c.locationid \r\n" + 
-                        "WHERE c.cabstatus = 'AVAILABLE' \r\n" +
-                        "GROUP BY l.locationname;";
+        String query = "SELECT l.locationname, GROUP_CONCAT(c.cabid ORDER BY c.cabid SEPARATOR ',') AS cabids \r\n" +
+               "FROM location.locations l \r\n" +
+               "JOIN cabposition.cabpositions c ON l.locationid = c.locationid \r\n" + 
+               "WHERE c.cabstatus = 'AVAILABLE' \r\n" +
+               "GROUP BY l.locationname;";
 
         List<CabPositions> availablecabs = new ArrayList<>();
 
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getCabPositionConnection();
             PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 
             ResultSet result = preparedStatement.executeQuery();
@@ -244,32 +256,33 @@ public class DatabaseStorage implements Storage {
                     result.getString("locationname"),
                     result.getString("cabids")
                 );
-                    
-            availablecabs.add(availablecab);
+                availablecabs.add(availablecab);
             }
                 
         } catch (SQLException e) {
             e.printStackTrace(); 
         }
         return availablecabs;
+  
     }
+
 
     public CustomerAck getFreeCab(int customerid, String source, String destination, String cabtype, LocalDateTime customerdeparturetime, LocalDateTime customerarrivaltime) {
         String query = "SELECT cp.cabid, ABS(src.distance - dest.distance) AS total_distance, COUNT(rd.rideid) AS trip_count " +
-            "FROM cabpositions cp " +
-            "JOIN users u ON cp.cabid = u.userid " +  // Join with users to check online status
-            "JOIN locations cl ON cp.locationid = cl.locationid " +
-            "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS src " +
-            "JOIN (SELECT distance FROM locations WHERE locationname = ?) AS dest " +
-            "LEFT JOIN ridedetails rd ON cp.cabid = rd.cabid " +
-            "WHERE cp.cabid != IFNULL((SELECT cabid FROM ridedetails ORDER BY rideid DESC LIMIT 1), -1) " +
+            "FROM cabposition.cabpositions cp " +
+            "JOIN onlinestatus.onlinestatus u ON cp.cabid = u.userid " +  // Join with users to check online status
+            "JOIN location.locations cl ON cp.locationid = cl.locationid " +
+            "JOIN (SELECT distance FROM location.locations WHERE locationname = ?) AS src " +
+            "JOIN (SELECT distance FROM location.locations WHERE locationname = ?) AS dest " +
+            "LEFT JOIN ridedetail.ridedetails rd ON cp.cabid = rd.cabid " +
+            "WHERE cp.cabid != IFNULL((SELECT cabid FROM ridedetail.ridedetails ORDER BY rideid DESC LIMIT 1), -1) " +
             "AND cp.cabstatus = 'AVAILABLE' AND cp.cabtype = ? " +
-            "AND u.onlinestatus = TRUE " +  // Check if the driver is online
-            "AND cp.cabid NOT IN (SELECT cabid FROM ridedetails WHERE (departuretime < ? AND arrivaltime > ?)) " +
+            // "AND u.onlinestatus = TRUE "
+            "AND cp.cabid NOT IN (SELECT cabid FROM ridedetail.ridedetails WHERE (arrivaltime <= ? OR departuretime >= ?)) " + // departuretime < ? AND arrivaltime > ?
             "GROUP BY cp.cabid, cl.distance " +
             "ORDER BY ABS(cl.distance - src.distance) ASC, trip_count ASC LIMIT 1 FOR UPDATE;";
-    
-        try (Connection connection = DatabaseConnection.getConnection()) {
+
+        try (Connection connection = DatabaseConnection.getCabPositionConnection()) {
             connection.setAutoCommit(false); // Start a transaction
     
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
@@ -314,132 +327,168 @@ public class DatabaseStorage implements Storage {
         }
     
         return null; // Return null if no cab was found
+
     }
     
-    // Method to schedule auto release of cab after a timeout
-    private void scheduleAutoRelease(int cabId, int customerid) {
-        // Scheduled task to revert cab status after 1 minute
-        Runnable autoReleaseTask = new Runnable() {
-            @Override
-            public void run() {
-                try (Connection connection = DatabaseConnection.getConnection()) {
-                    String updateQuery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT'";
-                    try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
-                        updateStmt.setInt(1, cabId);
-                        int rowsUpdated = updateStmt.executeUpdate();
-                        if (rowsUpdated > 0) {
-                            System.out.println("Cab " + cabId + " has been automatically released.");
-                            DriverSocket.sendCloseRequest(String.valueOf(cabId));
-                            String insertPenaltyQuery = "INSERT INTO customerdetails (customerid, penalty, date) VALUES (?, ?, ?);";
-                            try (PreparedStatement penaltyStatement = connection.prepareStatement(insertPenaltyQuery)) {
-                                penaltyStatement.setInt(1, customerid);
-                                penaltyStatement.setInt(2, 20);
-                                penaltyStatement.setDate(3, java.sql.Date.valueOf(java.time.LocalDate.now()));
-            
-                                penaltyStatement.executeUpdate();
-                            }
+    
+    // Schedules auto-release of cab after timeout, with cabpositions sharded
+    private void scheduleAutoRelease(int cabId, int customerId) {
+        Runnable autoReleaseTask = () -> {
 
+            try (
+                Connection cabconnection = DatabaseConnection.getCabPositionConnection(); // Cab shard
+                Connection customerShardConnection = DatabaseConnection.getShardConnection(customerId) 
+            ) {
+                // 1. Update cab status if still in WAIT
+                String updateQuery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT'";
+                try (PreparedStatement updateStmt = cabconnection.prepareStatement(updateQuery)) {
+                    updateStmt.setInt(1, cabId);
+                    int rowsUpdated = updateStmt.executeUpdate();
+
+                    if (rowsUpdated > 0) {
+                        System.out.println("Cab " + cabId + " has been automatically released.");
+
+                        // Notify cab driver via WebSocket
+                        DriverSocket.sendCloseRequest(String.valueOf(cabId));
+
+                        // 2. Insert penalty into centralized customerdetails (or customer_penalty table)
+                        String insertPenaltyQuery = "INSERT INTO customerdetails (customerid, penalty, date) VALUES (?, ?, ?)";
+                        try (PreparedStatement penaltyStmt = customerShardConnection.prepareStatement(insertPenaltyQuery)) {
+                            penaltyStmt.setInt(1, customerId);
+                            penaltyStmt.setInt(2, 20);
+                            penaltyStmt.setDate(3, java.sql.Date.valueOf(LocalDate.now()));
+                            penaltyStmt.executeUpdate();
                         }
                     }
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                } finally {
-                    scheduledTasks.remove(cabId); // clean up after running
                 }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            } finally {
+                scheduledTasks.remove(cabId); // Always clean up task
             }
         };
-    
-        // Schedule the auto-release task to run after 2 minute
+
+        // Schedule task after 2 minutes
         ScheduledFuture<?> future = scheduler.schedule(autoReleaseTask, 2, TimeUnit.MINUTES);
-        scheduledTasks.put(cabId, future);    
+        scheduledTasks.put(cabId, future);
     }
+
     
 
-    public boolean addRideHistory(int customerid, int cabid, int distance, String source, String destination, LocalDateTime departuretime, LocalDateTime arrivaltime){
-        String query = "INSERT INTO ridedetails(customerid, cabid, source, destination, fare, commission, departuretime, arrivaltime) VALUES (?,?,?,?,?,?,?,?)";
-
-        try (Connection connection = DatabaseConnection.getConnection();
-            PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-
-            preparedStatement.setInt(1, customerid);
-            preparedStatement.setInt(2, cabid);
-            preparedStatement.setString(3, source);
-            preparedStatement.setString(4, destination);
-            preparedStatement.setInt(5, distance * 10);
-            preparedStatement.setInt(6, distance * 3);
-            preparedStatement.setTimestamp(7, Timestamp.valueOf(departuretime));
-            preparedStatement.setTimestamp(8, Timestamp.valueOf(arrivaltime));
-
-            int val = preparedStatement.executeUpdate();
-
-            String updateQuery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT';";
-            try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
-                updateStmt.setInt(1,cabid);
+    public boolean addRideHistory(int customerid, int cabid, int distance, String source, String destination, LocalDateTime departuretime, LocalDateTime arrivaltime) {
+        String rideInsertQuery = "INSERT INTO ridedetails (customerid, cabid, source, destination, fare, commission, departuretime, arrivaltime) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String updateCabQuery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT'";
+    
+        boolean rideInserted = false;
+    
+        // 1. Insert into ridedetails
+        try (
+            Connection rideConn = DatabaseConnection.getRideDetailConnection();
+            PreparedStatement rideStmt = rideConn.prepareStatement(rideInsertQuery)
+        ) {
+            rideStmt.setInt(1, customerid);
+            rideStmt.setInt(2, cabid);
+            rideStmt.setString(3, source);
+            rideStmt.setString(4, destination);
+            rideStmt.setInt(5, distance * 10); // fare
+            rideStmt.setInt(6, distance * 3);  // commission
+            rideStmt.setTimestamp(7, Timestamp.valueOf(departuretime));
+            rideStmt.setTimestamp(8, Timestamp.valueOf(arrivaltime));
+    
+            int result = rideStmt.executeUpdate();
+            rideInserted = result > 0;
+    
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    
+        if (rideInserted) {
+            // 2. Update cabpositions
+            try (
+                Connection cabConn = DatabaseConnection.getCabPositionConnection();
+                PreparedStatement updateStmt = cabConn.prepareStatement(updateCabQuery)
+            ) {
+                updateStmt.setInt(1, cabid);
                 updateStmt.executeUpdate();
+            } catch (SQLException e) {
+                e.printStackTrace();
+                // Optional: log or schedule retry of cab status update
             }
+    
+            // 3. Cancel any scheduled WAIT task
             ScheduledFuture<?> future = scheduledTasks.remove(cabid);
             if (future != null) {
                 future.cancel(false);
             }
-            return val > 0;
-
-        } catch (SQLException e) {
-            e.printStackTrace();
+    
+            return true;
         }
-
+    
         return false;
     }
+    
 
     public boolean cancelRide(int cabid, int customerid) {
-        String updatecabpositionquery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT';";
+        String updateCabPositionQuery = "UPDATE cabpositions SET cabstatus = 'AVAILABLE' WHERE cabid = ? AND cabstatus = 'WAIT';";
         String insertPenaltyQuery = "INSERT INTO customerdetails (customerid, penalty, date) VALUES (?, ?, ?);";
 
+        boolean updated = false;
 
-        try (Connection connection = DatabaseConnection.getConnection();
-            PreparedStatement preparedStatement = connection.prepareStatement(updatecabpositionquery)) {
-            
-                preparedStatement.setInt(1, cabid);
-
-            int val = preparedStatement.executeUpdate();
-
-            if (val > 0) {
-                // If the cab status was updated successfully, insert the penalty record
-                try (PreparedStatement penaltyStatement = connection.prepareStatement(insertPenaltyQuery)) {
-                    penaltyStatement.setInt(1, customerid);
-                    penaltyStatement.setInt(2, 20);
-                    penaltyStatement.setDate(3, java.sql.Date.valueOf(java.time.LocalDate.now()));
-
-                    int penaltyResult = penaltyStatement.executeUpdate();
-
-                    ScheduledFuture<?> future = scheduledTasks.remove(cabid);
-                    if (future != null) {
-                        future.cancel(false);
-                    }
-                    return penaltyResult > 0;
-
-                }
+        try (
+            Connection cabConn = DatabaseConnection.getCabPositionConnection();
+            PreparedStatement updateStmt = cabConn.prepareStatement(updateCabPositionQuery)
+        ) {
+            updateStmt.setInt(1, cabid);
+            int updateResult = updateStmt.executeUpdate();
+            if (updateResult > 0) {
+                updated = true;
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
+            return false;
+        }
+
+        if (updated) {
+            try (
+                Connection customerConn = DatabaseConnection.getShardConnection(customerid); // or getCustomerShardConnection()
+                PreparedStatement penaltyStmt = customerConn.prepareStatement(insertPenaltyQuery)
+            ) {
+                penaltyStmt.setInt(1, customerid);
+                penaltyStmt.setInt(2, 20);
+                penaltyStmt.setDate(3, java.sql.Date.valueOf(LocalDate.now()));
+
+                int penaltyInserted = penaltyStmt.executeUpdate();
+
+                // Cancel scheduled auto-release if any
+                ScheduledFuture<?> future = scheduledTasks.remove(cabid);
+                if (future != null) {
+                    future.cancel(false);
+                }
+
+                return penaltyInserted > 0;
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
 
         return false;
     }
+
 
     public boolean updateCabPositions(int cabid, int locationid) {
 
         String query = "UPDATE cabpositions SET locationid = ? WHERE cabid = ?";
 
-        try (Connection connection = DatabaseConnection.getConnection();
-        PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+        try (Connection connection = DatabaseConnection.getCabPositionConnection();
+            PreparedStatement preparedStatement = connection.prepareStatement(query)) {
 
-       preparedStatement.setInt(1, locationid);
-       preparedStatement.setInt(2, cabid);
+            preparedStatement.setInt(1, locationid);
+            preparedStatement.setInt(2, cabid);
 
-       int val = preparedStatement.executeUpdate();
+            int val = preparedStatement.executeUpdate();
 
-       return val > 0;
+            return val > 0;
 
         } catch (SQLException e) {
             e.printStackTrace(); 
@@ -448,11 +497,11 @@ public class DatabaseStorage implements Storage {
         return false;
     }
 
-    public List<Ride> getCustomerRideSummary(int customerid){
+    public List<Ride> getCustomerRideSummary(int customerid) {
         String query = "SELECT source, destination, cabid, fare FROM ridedetails WHERE customerid = ?";
         List<Ride> rides = new ArrayList<>();
 
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getRideDetailConnection();
              PreparedStatement preparedStatement = connection.prepareStatement(query)) {
 
             preparedStatement.setInt(1, customerid);
@@ -476,40 +525,39 @@ public class DatabaseStorage implements Storage {
         }
         return rides;
     }
+    
 
     public List<Penalty> getPenalty(int customerid) {
-        String query = "SELECT penalty, date FROM  customerdetails WHERE customerid = ?";
+        String query = "SELECT penalty, date FROM customerdetails WHERE customerid = ?";
         List<Penalty> penalties = new ArrayList<>();
-
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+        
+        try (Connection connection = DatabaseConnection.getShardConnection(customerid);
+                PreparedStatement preparedStatement = connection.prepareStatement(query)) {
 
             preparedStatement.setInt(1, customerid);
             ResultSet result = preparedStatement.executeQuery();
 
             while (result.next()) {
-                // Create a new Ride object for each row
                 Penalty penalty = new Penalty(
-                    result.getInt("penalty"), // cabid
-                    //result.getDate("date") // source
+                    result.getInt("penalty"),
                     result.getObject("date", LocalDate.class)
                 );
-    
-                // Add the ride to the list
                 penalties.add(penalty);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace(); 
+            e.printStackTrace();
         }
+
         return penalties;
     }
+    
 
-    public List<Ride> getCabRideSummary(int cabid){
+    public List<Ride> getCabRideSummary(int cabid) {
         String query = "SELECT source, destination, customerid, fare, commission FROM ridedetails WHERE cabid = ?";
         List<Ride> rides = new ArrayList<>();
 
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getRideDetailConnection();
              PreparedStatement preparedStatement = connection.prepareStatement(query)) {
 
             preparedStatement.setInt(1, cabid);
@@ -535,12 +583,12 @@ public class DatabaseStorage implements Storage {
         }
         return rides;
     }
-
+    
     public List<List<Ride>> getAllCabRides() {
         String query = "SELECT cabid, customerid, source, destination, fare, commission FROM ridedetails ORDER BY cabid ASC";
         Map<Integer, List<Ride>> cabRideMap = new TreeMap<>(); // TreeMap keeps keys sorted
 
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getRideDetailConnection();
              PreparedStatement preparedStatement = connection.prepareStatement(query);
              ResultSet result = preparedStatement.executeQuery()) {
 
@@ -564,13 +612,13 @@ public class DatabaseStorage implements Storage {
         // Convert the grouped values to List<List<Ride>>
         return new ArrayList<>(cabRideMap.values());
     }
+    
 
     public List<TotalSummary> getTotalCabSummary() {
-
         String query = "SELECT cabid, COUNT(*) AS total_rides, SUM(fare) AS total_fare, SUM(commission) AS total_commission \r\n" + 
                         "FROM ridedetails GROUP BY cabid ORDER BY cabid ASC;";      
         List<TotalSummary> totalcabsummary = new ArrayList<>();
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getRideDetailConnection();
             PreparedStatement preparedStatement = connection.prepareStatement(query)) {
            
             ResultSet result = preparedStatement.executeQuery();
@@ -591,14 +639,14 @@ public class DatabaseStorage implements Storage {
             e.printStackTrace(); 
         }
         return totalcabsummary;
-        
     }
+    
 
     public List<List<Ride>> getAllCustomerRides() {
         String query = "SELECT cabid, customerid, source, destination, fare FROM ridedetails ORDER BY customerid ASC";
         Map<Integer, List<Ride>> customerRideMap = new TreeMap<>(); // TreeMap keeps keys sorted
 
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getRideDetailConnection();
              PreparedStatement preparedStatement = connection.prepareStatement(query);
              ResultSet result = preparedStatement.executeQuery()) {
 
@@ -621,13 +669,13 @@ public class DatabaseStorage implements Storage {
         // Convert the grouped values to List<List<Ride>>
         return new ArrayList<>(customerRideMap.values());
     }
+    
 
     public List<TotalSummary> getTotalCustomerSummary() {
-
         String query = "SELECT customerid, COUNT(*) AS total_rides, SUM(fare) AS total_fare \r\n" + 
                         "FROM ridedetails GROUP BY customerid ORDER BY customerid ASC;";      
         List<TotalSummary> totalcustomersummary = new ArrayList<>();
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = DatabaseConnection.getRideDetailConnection();
             PreparedStatement preparedStatement = connection.prepareStatement(query)) {
            
             ResultSet result = preparedStatement.executeQuery();
@@ -646,8 +694,6 @@ public class DatabaseStorage implements Storage {
             e.printStackTrace(); 
         }
         return totalcustomersummary;
-        
     }
-
 
 }

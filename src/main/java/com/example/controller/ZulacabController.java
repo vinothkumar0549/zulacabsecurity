@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 // import jakarta.servlet.http.Cookie;
 import org.json.*;
+import org.mindrot.jbcrypt.BCrypt;
+
 import com.example.database.DatabaseStorage;
 import com.example.database.Storage;
 import com.example.pojo.CabPositions;
@@ -85,7 +87,7 @@ public class ZulacabController {
             // You can now create a User object using the extracted data
             User user = new User();
             user.setUsername(username);
-            user.setEncryptedpassword(cabservice.encrypt(password, 1));
+            user.setEncryptedpassword(BCrypt.hashpw(password, BCrypt.gensalt(12)));
             user.setName(name);
             user.setAge(age);
             user.setGender(gender);
@@ -122,7 +124,7 @@ public class ZulacabController {
 
         try {
 
-            User user = cabservice.login(username, cabservice.encrypt(password, 1));
+            User user = cabservice.login(username, password);
 
             HttpSession session = request.getSession(true); // create session if not exists
             session.setAttribute("user", user); // store user object (or userId)
