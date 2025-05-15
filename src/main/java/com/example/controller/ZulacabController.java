@@ -4,6 +4,9 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 // import jakarta.servlet.http.Cookie;
 import org.json.*;
 import org.mindrot.jbcrypt.BCrypt;
@@ -39,6 +42,8 @@ import jakarta.ws.rs.core.Response;
 @Path("/cab")
 public class ZulacabController {
 
+    private static final Logger logger = Logger.getLogger(ZulacabController.class.getName());
+
     Storage storage = new DatabaseStorage();
 
     CabService cabservice = new CabService(storage);
@@ -47,6 +52,7 @@ public class ZulacabController {
     @Path("/hello")
     @Produces(MediaType.APPLICATION_JSON)
     public Response hello() {
+        logger.info("endpoint hello executed");
         return Response.status(Response.Status.OK).entity("Hello World").build();
     }
 
@@ -96,13 +102,17 @@ public class ZulacabController {
             // Call the service to register the user
             int id = cabservice.register(user, cablocation, cabtype);
 
+            logger.info("endpoint register executed");
             return Response.status(Response.Status.OK).entity("{\"userid\": \"" + id + "\"}").build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING,"Bad Request" , e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING,"Security Exception" , e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected exception", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
         
@@ -118,11 +128,13 @@ public class ZulacabController {
         String username = json.getString("username");
         String password = json.getString("password");
 
-        if(username == null || password == null){
-            return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"Invalid Arguments\"}").build();
-        }
+        
 
         try {
+            
+            if(username == null || password == null){
+                throw new IllegalArgumentException("Invalid Arugments");
+            }
 
             User user = cabservice.login(username, password);
 
@@ -130,12 +142,19 @@ public class ZulacabController {
             session.setAttribute("user", user); // store user object (or userId)
             session.setAttribute("role", user.getRole());
 
+            logger.info("endpoint login executed");
             return Response.status(Response.Status.OK).entity(user).build();
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING,"Bad Request" , e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING,"Security Excetpion" , e);
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING,"IllegalArguement Excetpion" , e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected Error");
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
         
@@ -154,22 +173,30 @@ public class ZulacabController {
         String locationname = json.getString("locationname");
         int distance = json.getInt("distance");
 
-        if(locationname == null || distance < 0){
-            throw new IllegalArgumentException("Invalid input");
-        }
+
         
         try {
+            if(locationname == null || distance < 0){
+                throw new IllegalArgumentException("Invalid input");
+            }
             
             AuthUtil.validateSession(request, Role.ADMIN);
 
             int locationid = cabservice.addlocation( locationname, distance);
+            logger.info("endpoint addlocation executed");
             return Response.status(Response.Status.OK).entity("{\"locationid\": \"" + locationid + "\"}").build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING,"Bad Request" , e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING,"Security Exception" , e);
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch(IllegalArgumentException e) {
+            logger.log(Level.WARNING,"IllegalArguement Excetpion" , e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE,"Unexpected Error" , e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
 
@@ -188,22 +215,30 @@ public class ZulacabController {
         String locationname = json.getString("locationname");
         int distance = json.getInt("distance");
 
-        if(locationname == null || distance < 0){
-            throw new IllegalArgumentException("Invalid input");
-        }
+       
         
         try {
+            if(locationname == null || distance < 0){
+                throw new IllegalArgumentException("Invalid input");
+            }
 
             AuthUtil.validateSession(request, Role.ADMIN);
 
             String message = cabservice.removelocation(locationname, distance);
+            logger.info("endpoint removelocation executed");
             return Response.status(Response.Status.OK).entity("{\"message\": \"" + message + "\"}").build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING,"Bad Request" , e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING,"Security Exception" , e);
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+        } catch(IllegalArgumentException e) {
+            logger.log(Level.WARNING,"Illegal Argument Exception" , e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE,"Unexpected error" , e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
 
@@ -221,17 +256,23 @@ public class ZulacabController {
         try {
             AuthUtil.validateSession(request, Role.CUSTOMER);
             List<CabPositions> availablecabs = cabservice.checkavailablecab();
+            logger.info("endpoint checkavialable executed");
             return Response.status(Response.Status.OK).entity(Map.of("availablecabs", availablecabs)).build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING,"Bad Request" , e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING,"Security Exception" , e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING,"Illegal Argument" , e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalStateException e) {
+            logger.log(Level.WARNING,"Illegal State" , e);
             return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE,"Unexpected Error" , e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
@@ -270,17 +311,24 @@ public class ZulacabController {
             String roomid = RoomIdGenerator.generateRoomId();
             customerAck.setRoomid(roomid);
             DriverSocket.sendRideAssignment(String.valueOf(customerAck.getCabid()), customerAck.getRoomid(), source, destination); 
+            logger.info("endpoint bookcab executed");
+
             return Response.status(Response.Status.OK).entity(customerAck).build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING, "Bad Request", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING, "Security Exception", e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Illegal Argument", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalStateException e) {
+            logger.log(Level.WARNING, "Illegal state exception", e);
             return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected Error", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
@@ -316,18 +364,25 @@ public class ZulacabController {
             User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
             if(confirm){
                 int id = cabservice.confirmride(customer, cabid, distance, source, destination, departuretime, arrivaltime);
+                logger.info("endpoint rideinformation executed");
+
                 return Response.status(Response.Status.OK).entity("{\"cabid\": \"" + id + "\"}").build();
             }
             throw new IllegalArgumentException("Ride Cancelled");
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING, "Bad Request", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING, "Security Exception", e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Illegal Argument", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalStateException e) {
+            logger.log(Level.WARNING, "Illegal state exception", e);
             return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected Error", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
@@ -351,17 +406,24 @@ public class ZulacabController {
 
             AuthUtil.validateSession(request, Role.CUSTOMER);
             cabservice.cancelride(cabid, customerid);
+            logger.info("endpoint cancelride executed");
+
             return Response.status(Response.Status.OK).entity("{\"cancel\": \"" + cabid + "\"}").build();
             
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING, "Bad Request", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING, "Security Exception", e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Illegal Argument", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalStateException e) {
+            logger.log(Level.WARNING, "Illegal state exception", e);
             return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected Error", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
@@ -379,17 +441,24 @@ public class ZulacabController {
         try {
             User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
             List<Ride> customerrides = cabservice.customerSummary(customer);
+            logger.info("endpoint customersummary executed");
+
             return Response.status(Response.Status.OK).entity(Map.of("customersummary", customerrides)).build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING, "Bad Request", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING, "Security Exception", e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Illegal Argument", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalStateException e) {
+            logger.log(Level.WARNING, "Illegal state exception", e);
             return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected Error", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
@@ -406,17 +475,24 @@ public class ZulacabController {
         try {
             User customer = AuthUtil.validateSession(request, Role.CUSTOMER);
             List<Penalty> penalties = cabservice.getpenalty(customer);
+            logger.info("endpoint penalty executed");
+
             return Response.status(Response.Status.OK).entity(Map.of("penalty", penalties)).build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING, "Bad Request", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING, "Security Exception", e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Illegal Argument", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalStateException e) {
+            logger.log(Level.WARNING, "Illegal state exception", e);
             return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected Error", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
@@ -433,17 +509,24 @@ public class ZulacabController {
         try {
             User cab = AuthUtil.validateSession(request, Role.CAB);
             List<Ride> cabrides = cabservice.cabSummary(cab);
+            logger.info("endpoint cabsummary executed");
+
             return Response.status(Response.Status.OK).entity(Map.of("cabsummary", cabrides)).build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING, "Bad Request", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING, "Security Exception", e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Illegal Argument", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalStateException e) {
+            logger.log(Level.WARNING, "Illegal state exception", e);
             return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected Error", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
@@ -464,17 +547,24 @@ public class ZulacabController {
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("cabsummary", allcabridesummary);
             responseMap.put("totalcabsummary", totalcabsummary);
+            logger.info("endpoint getallcabsummary executed");
+
             return Response.status(Response.Status.OK).entity(responseMap).build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING, "Bad Request", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING, "Security Exception", e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Illegal Argument", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalStateException e) {
+            logger.log(Level.WARNING, "Illegal state exception", e);
             return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected Error", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
@@ -495,30 +585,27 @@ public class ZulacabController {
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("customersummary", allcustomerridesummary);
             responseMap.put("totalcustomersummary", totalcustomersummary);
+            logger.info("endpoint getallcustomersummary executed");
+
             return Response.status(Response.Status.OK).entity(responseMap).build();
 
         } catch (BadRequestException e) {
+            logger.log(Level.WARNING, "Bad Request", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (SecurityException e) {
+            logger.log(Level.WARNING, "Security Exception", e);
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Illegal Argument", e);
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (IllegalStateException e) {
+            logger.log(Level.WARNING, "Illegal state exception", e);
             return Response.status(Response.Status.NOT_FOUND).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Unexpected Error", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
         }
     }
-
-    // @POST
-    // @Path("/logout")
-    // public Response logout(@Context HttpServletRequest request) {
-    //     HttpSession session = request.getSession(false);
-    //     if (session != null) {
-    //         session.invalidate();
-    //     }
-    //     return Response.ok("Logged out successfully").build();
-    // }
 
     @POST
     @Path("/logout")
@@ -538,6 +625,7 @@ public class ZulacabController {
         // cookie.setHttpOnly(true);    // Optional but good practice
         // response.addCookie(cookie);  // Send the deletion command
 
+        logger.info("endpoint logout executed");
         return Response.ok("{\"message\": \"Logout Successfully\"}").build();
     }
 

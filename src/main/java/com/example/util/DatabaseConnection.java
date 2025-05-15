@@ -24,7 +24,13 @@ public class DatabaseConnection {
     private static final String DB_PASSWORD = dotenv.get("DB_PASSWORD");
 
     private static ShardManager shardManager;
+
     private static Connection lookupDbConnection;
+    private static Connection locationConnection;
+    private static Connection cabPositionConnection;
+    private static Connection rideDetailConnection;
+    private static Connection onlineStatusConnection;
+
 
     static {
         try {
@@ -33,6 +39,11 @@ public class DatabaseConnection {
             Class.forName("com.mysql.cj.jdbc.Driver");
             lookupDbConnection = DriverManager.getConnection(LOOKUP_DB_URL, DB_USER, DB_PASSWORD);
             shardManager = new ShardManager(lookupDbConnection);
+
+            locationConnection = DriverManager.getConnection(dotenv.get("LOCATION_DB"), DB_USER, DB_PASSWORD);
+            cabPositionConnection = DriverManager.getConnection(dotenv.get("CABPOSITION_DB"), DB_USER, DB_PASSWORD);
+            rideDetailConnection = DriverManager.getConnection(dotenv.get("RIDEDETAIL_DB"), DB_USER, DB_PASSWORD);
+            onlineStatusConnection = DriverManager.getConnection(dotenv.get("ONLINESTATUS_DB"), DB_USER, DB_PASSWORD);
 
             // Register shutdown hook to close lookup connection
             // Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -63,8 +74,9 @@ public class DatabaseConnection {
 
             while (rs.next()) {
                 int shardId = rs.getInt("shard_id");
-                String shardDbUrl = dotenv.get("SHARD_USER_DB") + shardId;
-                Connection shardConnection = DriverManager.getConnection(shardDbUrl, DB_USER, DB_PASSWORD);
+                // String shardDbUrl = dotenv.get("SHARD_USER_DB") + shardId;
+                // Connection shardConnection = DriverManager.getConnection(shardDbUrl, DB_USER, DB_PASSWORD);
+                Connection shardConnection = shardManager.getShardConnection(shardId);
                 shardConnections.add(shardConnection);
             }
         }
@@ -73,19 +85,19 @@ public class DatabaseConnection {
     }
     
     public static Connection getLocationConnection() throws SQLException {
-        return DriverManager.getConnection(dotenv.get("LOCATION_DB"),  DB_USER, DB_PASSWORD);
+        return locationConnection;
     }
 
     public static Connection getCabPositionConnection() throws SQLException {
-        return DriverManager.getConnection(dotenv.get("CABPOSITION_DB"),  DB_USER, DB_PASSWORD);
+        return cabPositionConnection;
     }
 
     public static Connection getRideDetailConnection() throws SQLException {
-        return DriverManager.getConnection(dotenv.get("RIDEDETAIL_DB"),  DB_USER, DB_PASSWORD);
+        return rideDetailConnection;
     }
 
     public static Connection getOnlineStatusConnection() throws SQLException {
-        return DriverManager.getConnection(dotenv.get("ONLINESTATUS_DB"),  DB_USER, DB_PASSWORD);
+        return onlineStatusConnection;
     }
 
     public static ShardManager getShardManager() {
