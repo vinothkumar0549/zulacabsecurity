@@ -2,6 +2,8 @@ package com.example.util;
 
 import io.github.cdimascio.dotenv.Dotenv;
 
+import java.util.logging.Logger;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -12,6 +14,7 @@ import java.util.List;
 
 public class DatabaseConnection {
 
+    private static final Logger logger = Logger.getLogger(DatabaseConnection.class.getName());
 
 
     private static Dotenv dotenv = Dotenv.configure().directory("C:\\Users\\Administrator\\Desktop\\zulacab\\cab\\.env").load();
@@ -25,18 +28,19 @@ public class DatabaseConnection {
 
     static {
         try {
-
+            System.out.println("Class is created");
+            logger.info("Try to create connection to the mysql database");
             Class.forName("com.mysql.cj.jdbc.Driver");
             lookupDbConnection = DriverManager.getConnection(LOOKUP_DB_URL, DB_USER, DB_PASSWORD);
             shardManager = new ShardManager(lookupDbConnection);
 
             // Register shutdown hook to close lookup connection
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                if (shardManager != null) {
-                    shardManager.close();
-                }
-
-            }));
+            // Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            //     if (shardManager != null) {
+            //         shardManager.close();
+            //     }
+            //     logger.info("trying to the close the connection to the mysql database after server close");
+            // }));
 
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
@@ -82,6 +86,10 @@ public class DatabaseConnection {
 
     public static Connection getOnlineStatusConnection() throws SQLException {
         return DriverManager.getConnection(dotenv.get("ONLINESTATUS_DB"),  DB_USER, DB_PASSWORD);
+    }
+
+    public static ShardManager getShardManager() {
+        return shardManager;
     }
 
 }
