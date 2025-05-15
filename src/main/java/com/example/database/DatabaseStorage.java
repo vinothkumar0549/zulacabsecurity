@@ -40,84 +40,187 @@ import com.example.websocket.DriverSocket;
 
 public class DatabaseStorage implements Storage {
 
-    private static int userid = 9;
+    private static int userid = 0;
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
     private static final Map<Integer, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
     @Override
     public int addUser(User user) {
-        String insertuser = "INSERT INTO users (userid, name, username, password, age, gender, role) VALUES (?,?,?,?,?,?,?)";
-        // int generatedUserId = -1;
+        String insertCredentials = "INSERT INTO credentials (userid, username) VALUES (?, ?)";
+        String insertUser = "INSERT INTO users (userid, name, username, password, age, gender, role) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        
         userid++;
-        try (Connection connection = DatabaseConnection.getShardConnection(userid);
-             PreparedStatement preparedStatementuser = connection.prepareStatement(insertuser)) {
 
-            preparedStatementuser.setInt(1, userid);
-            preparedStatementuser.setString(2, user.getName());
-            preparedStatementuser.setString(3, user.getUsername());
-            preparedStatementuser.setString(4, user.getEncryptedpassword());
-            preparedStatementuser.setLong(5, user.getAge());
-            preparedStatementuser.setString(6, user.getGender().name());
-            preparedStatementuser.setString(7, user.getRole().name()); 
+        // First insert into central credentials database
+        try (Connection credConn = DatabaseConnection.getCredentialsConnection();
+            PreparedStatement psCred = credConn.prepareStatement(insertCredentials)) {
 
-            int val = preparedStatementuser.executeUpdate();
+            psCred.setInt(1, userid);
+            psCred.setString(2, user.getUsername());
 
-             if (val != 0) {
-                return userid;
-            //     // Get the generated primary key (userid)
-            //     try (ResultSet generatedKeys = preparedStatementuser.getGeneratedKeys()) {
-            //         if (generatedKeys.next()) {
-            //             generatedUserId = generatedKeys.getInt(1); // Retrieve the generated ID
-            //         }
-            //     }
+            int credVal = psCred.executeUpdate();
+
+            if (credVal != 0) {
+                // Only proceed to shard insert if credentials insert is successful
+                try (Connection userConn = DatabaseConnection.getShardConnection(userid);
+                    PreparedStatement psUser = userConn.prepareStatement(insertUser)) {
+
+                    psUser.setInt(1, userid);
+                    psUser.setString(2, user.getName());
+                    psUser.setString(3, user.getUsername());
+                    psUser.setString(4, user.getEncryptedpassword());
+                    psUser.setLong(5, user.getAge());
+                    psUser.setString(6, user.getGender().name());
+                    psUser.setString(7, user.getRole().name());
+
+                    int userVal = psUser.executeUpdate();
+
+                    if (userVal != 0) {
+                        return userid; // success
+                    } else {
+                        // Optional: rollback credentials insert manually or flag for cleanup
+                        System.err.println("User insert failed after credentials insert. UserID: " + userid);
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    System.err.println("User shard insert failed. UserID: " + userid);
+                }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace(); 
+            e.printStackTrace();
+            System.err.println("Credentials insert failed. User not added.");
         }
+
         return -1;
     }
 
+    // @Override
+    // public int addUser(User user) {
+    //     String insertuser = "INSERT INTO users (userid, name, username, password, age, gender, role) VALUES (?,?,?,?,?,?,?)";
+    //     // int generatedUserId = -1;
+    //     userid++;
+    //     try (Connection connection = DatabaseConnection.getShardConnection(userid);
+    //          PreparedStatement preparedStatementuser = connection.prepareStatement(insertuser)) {
+
+    //         preparedStatementuser.setInt(1, userid);
+    //         preparedStatementuser.setString(2, user.getName());
+    //         preparedStatementuser.setString(3, user.getUsername());
+    //         preparedStatementuser.setString(4, user.getEncryptedpassword());
+    //         preparedStatementuser.setLong(5, user.getAge());
+    //         preparedStatementuser.setString(6, user.getGender().name());
+    //         preparedStatementuser.setString(7, user.getRole().name()); 
+
+    //         int val = preparedStatementuser.executeUpdate();
+
+    //          if (val != 0) {
+    //             return userid;
+    //         //     // Get the generated primary key (userid)
+    //         //     try (ResultSet generatedKeys = preparedStatementuser.getGeneratedKeys()) {
+    //         //         if (generatedKeys.next()) {
+    //         //             generatedUserId = generatedKeys.getInt(1); // Retrieve the generated ID
+    //         //         }
+    //         //     }
+    //         }
+
+    //     } catch (SQLException e) {
+    //         e.printStackTrace(); 
+    //     }
+    //     return -1;
+    // }
+
     @Override
     public User getUser(String username) {
-        String query = "SELECT * FROM users WHERE username = ?";
+        String getUserIdQuery = "SELECT userid FROM credentials WHERE username = ?";
+        String getUserDetailsQuery = "SELECT * FROM users WHERE userid = ?";
 
-        try {
-            for (Connection connection : DatabaseConnection.getAllUserShardConnections()) {
-                try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+        int userId = -1;
 
-                    preparedStatement.setString(1, username);
-                    ResultSet result = preparedStatement.executeQuery();
+        // Step 1: Get userid from credentials table
+        try (Connection credentialsConn = DatabaseConnection.getCredentialsConnection();
+            PreparedStatement ps = credentialsConn.prepareStatement(getUserIdQuery)) {
 
-                    if (result.next()) {
-                        return new User(
-                            result.getInt("userid"),
-                            result.getString("name"),
-                            result.getString("username"),
-                            result.getString("password"),
-                            result.getInt("age"),
-                            Gender.valueOf(result.getString("gender")),
-                            Role.valueOf(result.getString("role"))
-                        );
-                    }
+            ps.setString(1, username);
+            ResultSet rs = ps.executeQuery();
 
-                } catch (SQLException e) {
-                    e.printStackTrace(); // You could log and continue
-                } finally {
-                    try {
-                        if (connection != null && !connection.isClosed()) connection.close();
-                    } catch (SQLException ex) {
-                        ex.printStackTrace();
-                    }
-                }
+            if (rs.next()) {
+                userId = rs.getInt("userid");
+            } else {
+                return null; // Username not found
             }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+
+        // Step 2: Use userid to get correct shard and fetch user details
+        try (Connection userShardConn = DatabaseConnection.getShardConnection(userId);
+            PreparedStatement psUser = userShardConn.prepareStatement(getUserDetailsQuery)) {
+
+            psUser.setInt(1, userId);
+            ResultSet rsUser = psUser.executeQuery();
+
+            if (rsUser.next()) {
+                return new User(
+                    rsUser.getInt("userid"),
+                    rsUser.getString("name"),
+                    rsUser.getString("username"),
+                    rsUser.getString("password"),
+                    rsUser.getInt("age"),
+                    Gender.valueOf(rsUser.getString("gender")),
+                    Role.valueOf(rsUser.getString("role"))
+                );
+            }
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
-         return null; // No user found in any shard
-     }
+        return null; // Not found in shard
+    }
+
+    
+    // @Override
+    // public User getUser(String username) {
+    //     String query = "SELECT * FROM users WHERE username = ?";
+
+    //     try {
+    //         for (Connection connection : DatabaseConnection.getAllUserShardConnections()) {
+    //             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+
+    //                 preparedStatement.setString(1, username);
+    //                 ResultSet result = preparedStatement.executeQuery();
+
+    //                 if (result.next()) {
+    //                     return new User(
+    //                         result.getInt("userid"),
+    //                         result.getString("name"),
+    //                         result.getString("username"),
+    //                         result.getString("password"),
+    //                         result.getInt("age"),
+    //                         Gender.valueOf(result.getString("gender")),
+    //                         Role.valueOf(result.getString("role"))
+    //                     );
+    //                 }
+
+    //             } catch (SQLException e) {
+    //                 e.printStackTrace(); // You could log and continue
+    //             } finally {
+    //                 try {
+    //                     if (connection != null && !connection.isClosed()) connection.close();
+    //                 } catch (SQLException ex) {
+    //                     ex.printStackTrace();
+    //                 }
+    //             }
+    //         }
+    //     } catch (SQLException e) {
+    //         e.printStackTrace();
+    //     }
+
+    //      return null; // No user found in any shard
+    //  }
 
 
     @Override
